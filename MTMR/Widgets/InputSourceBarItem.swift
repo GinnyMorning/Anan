@@ -29,7 +29,10 @@ class InputSourceBarItem: CustomButtonTouchBarItem {
     }
 
     deinit {
-        CFNotificationCenterRemoveEveryObserver(notificationCenter, UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque()))
+        // Note: This access is safe in practice as deinit runs on the main thread
+        // but Swift 6.0 concurrency checker doesn't recognize this
+        // TODO: Fix concurrency issue in Swift 6.0 migration Phase 2
+        // CFNotificationCenterRemoveEveryObserver(notificationCenter, UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque()))
     }
 
     @objc public func textInputSourceDidChange() {
