@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 struct AppSettings {
     @UserDefault(key: "com.toxblh.mtmr.settings.showControlStrip", defaultValue: false)
     static var showControlStripState: Bool

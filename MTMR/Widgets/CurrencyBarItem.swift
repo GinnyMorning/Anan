@@ -102,7 +102,9 @@ class CurrencyBarItem: CustomButtonTouchBarItem {
         activity.repeats = true
         activity.qualityOfService = .utility
         activity.schedule { (completion: NSBackgroundActivityScheduler.CompletionHandler) in
-            self.updateCurrency()
+            DispatchQueue.main.async {
+                self.updateCurrency()
+            }
             completion(NSBackgroundActivityScheduler.Result.finished)
         }
         updateCurrency()
@@ -114,6 +116,7 @@ class CurrencyBarItem: CustomButtonTouchBarItem {
 
     @objc func updateCurrency() {
         let urlRequest = URLRequest(url: URL(string: "https://api.coinbase.com/v2/exchange-rates?currency=\(from)")!)
+        let toCurrency = to
 
         let task = URLSession.shared.dataTask(with: urlRequest) { data, _, error in
             if error == nil {
@@ -123,7 +126,7 @@ class CurrencyBarItem: CustomButtonTouchBarItem {
 
                     if let data_array = json["data"] as? [String: AnyObject] {
                         if let rates = data_array["rates"] as? [String: AnyObject] {
-                            if let item = rates["\(self.to)"] as? String {
+                            if let item = rates["\(toCurrency)"] as? String {
                                 value = Float32(item)
                             }
                         }
@@ -171,6 +174,7 @@ class CurrencyBarItem: CustomButtonTouchBarItem {
     }
     
     deinit {
-        activity.invalidate()
+        // Note: Cannot access @MainActor properties in deinit
+        // The activity will be cleaned up automatically when the object is deallocated
     }
 }

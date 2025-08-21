@@ -52,8 +52,7 @@ typealias ParametersDecoder = (Decoder) throws -> (
     parameters: [GeneralParameters.CodingKeys: GeneralParameter]
 )
 
-@MainActor
-final class SupportedTypesHolder {
+final class SupportedTypesHolder: Sendable {
     private let supportedTypes: [String: ParametersDecoder] = [
         "escape": { _ in (
             item: .staticButton(title: "esc"),
@@ -227,7 +226,6 @@ final class SupportedTypesHolder {
 
     ]
 
-    // Note: Changed from singleton to instance to avoid concurrency issues
     static let sharedInstance = SupportedTypesHolder()
 
     func lookup(by type: String, actions: [Action]) -> ParametersDecoder {
@@ -240,6 +238,7 @@ final class SupportedTypesHolder {
         ) }
     }
 
+    }
 }
 
 enum ItemType: Decodable {

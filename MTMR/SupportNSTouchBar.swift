@@ -6,6 +6,7 @@
 //  Copyright © 2018 Anton Palgunov. All rights reserved.
 //
 
+@MainActor
 func presentSystemModal(_ touchBar: NSTouchBar!, systemTrayItemIdentifier identifier: NSTouchBarItem.Identifier!) {
     if #available(OSX 10.14, *) {
         NSTouchBar.presentSystemModalTouchBar(touchBar, systemTrayItemIdentifier: identifier)
@@ -14,6 +15,7 @@ func presentSystemModal(_ touchBar: NSTouchBar!, systemTrayItemIdentifier identi
     }
 }
 
+@MainActor
 func presentSystemModal(_ touchBar: NSTouchBar!, placement: Int64, systemTrayItemIdentifier identifier: NSTouchBarItem.Identifier!) {
     if #available(OSX 10.14, *) {
         NSTouchBar.presentSystemModalTouchBar(touchBar, placement: placement, systemTrayItemIdentifier: identifier)
@@ -22,6 +24,7 @@ func presentSystemModal(_ touchBar: NSTouchBar!, placement: Int64, systemTrayIte
     }
 }
 
+@MainActor
 func minimizeSystemModal(_ touchBar: NSTouchBar!) {
     if #available(OSX 10.14, *) {
         NSTouchBar.minimizeSystemModalTouchBar(touchBar)

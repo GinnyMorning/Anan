@@ -8,6 +8,7 @@
 
 import Foundation
 
+@MainActor
 class CPUBarItem: CustomButtonTouchBarItem {
     private let refreshInterval: TimeInterval
     private var refreshQueue: DispatchQueue? = DispatchQueue(label: "mtmr.cpu")
@@ -30,7 +31,10 @@ class CPUBarItem: CustomButtonTouchBarItem {
             ))
         }
         
-        refreshAndSchedule()
+        // Schedule the first refresh on the main queue
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshAndSchedule()
+        }
     }
 
     required init?(coder _: NSCoder) {
@@ -38,40 +42,42 @@ class CPUBarItem: CustomButtonTouchBarItem {
     }
     
     func refreshAndSchedule() {
-        DispatchQueue.main.async {
-            // Get CPU load
-            let usage = 100 - CPU.systemUsage().idle
-            guard usage.isFinite else {
-                return
-            }
-            
-            // Choose color based on CPU load
-            var color: NSColor? = nil
-            var bgColor: NSColor? = nil
-            if usage > 70 {
-                color = .black
-                bgColor = .yellow
-            } else if usage > 30 {
-                color = .yellow
-            }
-            
-            // Update layout
-            let attrTitle = NSMutableAttributedString.init(attributedString: String(format: "%.1f%%", usage).defaultTouchbarAttributedString)
-            if let color = color {
-                attrTitle.addAttributes([.foregroundColor: color], range: NSRange(location: 0, length: attrTitle.length))
-            }
-            self.attributedTitle = attrTitle
-            self.backgroundColor = bgColor
+        // Get CPU load
+        let usage = 100 - CPU.systemUsage().idle
+        guard usage.isFinite else {
+            return
         }
         
+        // Choose color based on CPU load
+        var color: NSColor? = nil
+        var bgColor: NSColor? = nil
+        if usage > 70 {
+            color = .black
+            bgColor = .yellow
+        } else if usage > 30 {
+            color = .yellow
+        }
+        
+        // Update layout
+        let attrTitle = NSMutableAttributedString.init(attributedString: String(format: "%.1f%%", usage).defaultTouchbarAttributedString)
+        if let color = color {
+            attrTitle.addAttributes([.foregroundColor: color], range: NSRange(location: 0, length: attrTitle.length))
+        }
+        self.attributedTitle = attrTitle
+        self.backgroundColor = bgColor
+        
+        // Schedule next refresh
         refreshQueue?.asyncAfter(deadline: .now() + refreshInterval) { [weak self] in
-            self?.refreshAndSchedule()
+            DispatchQueue.main.async {
+                self?.refreshAndSchedule()
+            }
         }
     }
 
     func defaultTapAction() {
+        let script = defaultSingleTapScript
         refreshQueue?.async { [weak self] in
-            self?.defaultSingleTapScript.executeAndReturnError(nil)
+            script?.executeAndReturnError(nil)
         }
     }
     

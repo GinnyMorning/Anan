@@ -54,7 +54,9 @@ class UpNextScrubberTouchBarItem: NSCustomTouchBarItem {
         activity.repeats = true
         activity.qualityOfService = .utility
         activity.schedule { (completion: NSBackgroundActivityScheduler.CompletionHandler) in
-            self.updateView()
+            Task { @MainActor in
+                self.updateView()
+            }
             completion(NSBackgroundActivityScheduler.Result.finished)
         }
         updateView()
@@ -64,6 +66,7 @@ class UpNextScrubberTouchBarItem: NSCustomTouchBarItem {
         fatalError("init(coder:) has not been implemented")
     }
     
+    @MainActor
     private func updateView() -> Void {
         items = []
         var upcomingEvents = self.getUpcomingEvents()

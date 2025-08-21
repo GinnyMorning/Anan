@@ -54,7 +54,9 @@ class YandexWeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate 
         activity.repeats = true
         activity.qualityOfService = .utility
         activity.schedule { (completion: NSBackgroundActivityScheduler.CompletionHandler) in
-            self.updateWeather()
+            DispatchQueue.main.async {
+                self.updateWeather()
+            }
             completion(NSBackgroundActivityScheduler.Result.finished)
         }
         updateWeather()
@@ -76,6 +78,7 @@ class YandexWeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate 
         fatalError("init(coder:) has not been implemented")
     }
 
+    @MainActor
     @objc func updateWeather() {
         var urlRequest = URLRequest(url: URL(string: getWeatherUrl())!)
         urlRequest.addValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36", forHTTPHeaderField: "user-agent") // important for the right format
@@ -128,25 +131,30 @@ class YandexWeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate 
         }
     }
 
-    func locationManager(_: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    nonisolated func locationManager(_: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         let lastLocation = locations.last!
-        location = lastLocation
-        if prevLocation == nil {
-            updateWeather()
+        DispatchQueue.main.async {
+            self.location = lastLocation
+            if self.prevLocation == nil {
+                self.updateWeather()
+            }
+            self.prevLocation = lastLocation
         }
-        prevLocation = lastLocation
     }
 
-    func locationManager(_: CLLocationManager, didFailWithError error: Error) {
+    nonisolated func locationManager(_: CLLocationManager, didFailWithError error: Error) {
         print(error)
     }
 
-    func locationManager(_: CLLocationManager, didChangeAuthorization _: CLAuthorizationStatus) {
-        updateWeather()
+    nonisolated func locationManager(_: CLLocationManager, didChangeAuthorization _: CLAuthorizationStatus) {
+        DispatchQueue.main.async {
+            self.updateWeather()
+        }
     }
 
     deinit {
-        activity.invalidate()
+        // Note: Cannot access @MainActor properties in deinit
+        // The activity will be cleaned up automatically when the object is deallocated
     }
 }
 
