@@ -5,11 +5,13 @@
 //  Created by bobr on 08/08/2019.
 //  Copyright © 2019 Anton Palgunov. All rights reserved.
 //
+import Cocoa
 import Foundation
 
+@MainActor
 class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
-    private let interval: TimeInterval
-    private let source: String
+    private var source: String
+    private var interval: TimeInterval
     private var forceHideConstraint: NSLayoutConstraint!
     
     struct ScriptResult: Decodable {
@@ -25,7 +27,9 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
         forceHideConstraint = view.widthAnchor.constraint(equalToConstant: 0)
         
         DispatchQueue.shellScriptQueue.async {
-            self.refreshAndSchedule()
+            DispatchQueue.main.async {
+                self.refreshAndSchedule()
+            }
         }
     }
     
@@ -72,7 +76,9 @@ class ShellScriptTouchBarItem: CustomButtonTouchBarItem {
         
         // Schedule next update
         DispatchQueue.shellScriptQueue.asyncAfter(deadline: .now() + interval) { [weak self] in
-            self?.refreshAndSchedule()
+            DispatchQueue.main.async {
+                self?.refreshAndSchedule()
+            }
         }
     }
     

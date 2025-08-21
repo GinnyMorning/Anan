@@ -54,7 +54,7 @@ class UpNextScrubberTouchBarItem: NSCustomTouchBarItem {
         activity.repeats = true
         activity.qualityOfService = .utility
         activity.schedule { (completion: NSBackgroundActivityScheduler.CompletionHandler) in
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 self.updateView()
             }
             completion(NSBackgroundActivityScheduler.Result.finished)

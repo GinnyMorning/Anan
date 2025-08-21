@@ -1,6 +1,6 @@
 import Foundation
 
-class DarkModeBarItem: CustomButtonTouchBarItem, Widget {
+class DarkModeBarItem: CustomButtonTouchBarItem, @preconcurrency Widget {
     static var name: String = "darkmode"
     static var identifier: String = "com.toxblh.mtmr.darkmode"
 

@@ -8,7 +8,7 @@
 
 import Cocoa
 
-class PomodoroBarItem: CustomButtonTouchBarItem, Widget {
+class PomodoroBarItem: CustomButtonTouchBarItem, @preconcurrency Widget {
     static let identifier = "com.toxblh.mtmr.pomodoro."
     static let name = "pomodoro"
     static let decoder: ParametersDecoder = { decoder in

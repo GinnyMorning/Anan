@@ -7,7 +7,8 @@ extension Data {
     }
 }
 
-struct BarItemDefinition: Decodable {
+@MainActor
+struct BarItemDefinition: @preconcurrency Decodable {
     let type: ItemType
     let actions: [Action]
     let legacyAction: LegacyActionType
@@ -224,6 +225,34 @@ final class SupportedTypesHolder {
             legacyLongAction: .none,
             parameters: [:]
         ) },
+
+        "exitTouchbar": { _ in (
+            item: .staticButton(title: "exit"),
+            actions: [
+                Action(trigger: .singleTap, value: .custom(closure: { 
+                    // This will be handled by the TouchBarController
+                    // The closure will be replaced with the actual implementation
+                    return
+                }))
+            ],
+            legacyAction: .none,
+            legacyLongAction: .none,
+            parameters: [:]
+        ) },
+
+        "close": { _ in (
+            item: .staticButton(title: ""),
+            actions: [
+                Action(trigger: .singleTap, value: .custom(closure: { 
+                    // This will be handled by the TouchBarController
+                    // The closure will be replaced with the actual implementation
+                    return
+                }))
+            ],
+            legacyAction: .none,
+            legacyLongAction: .none,
+            parameters: [.width: .width(30), .image: .image(source: NSImage(named: NSImage.stopProgressFreestandingTemplateName)!)]
+        ) }
 
     ]
 

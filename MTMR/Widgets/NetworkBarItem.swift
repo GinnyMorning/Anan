@@ -8,7 +8,8 @@
 
 import Foundation
 
-class NetworkBarItem: CustomButtonTouchBarItem, Widget {
+@MainActor
+class NetworkBarItem: CustomButtonTouchBarItem, @preconcurrency Widget {
     static var name: String = "network"
     static var identifier: String = "com.toxblh.mtmr.network"
     

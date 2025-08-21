@@ -8,6 +8,7 @@
 
 import Foundation
 
+@MainActor
 class CustomSliderCell: NSSliderCell {
     var knobImage: NSImage!
     private var _currentKnobRect: NSRect!
@@ -67,6 +68,7 @@ class CustomSliderCell: NSSliderCell {
     }
 }
 
+@MainActor
 class CustomSlider: NSSlider {
     var currentValue: CGFloat = 0
 
