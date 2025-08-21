@@ -28,12 +28,19 @@ class DnDBarItem: CustomButtonTouchBarItem {
     }
 
     func DnDToggle() {
-        DoNotDisturb.isEnabled = !DoNotDisturb.isEnabled
+        print("MTMR: DND widget - Toggling DND status")
+        NSLog("MTMR: DND widget - Toggling DND status")
+        let newStatus = !DoNotDisturb.isEnabled
+        DoNotDisturb.isEnabled = newStatus
+        print("MTMR: DND widget - DND status set to: \(newStatus)")
+        NSLog("MTMR: DND widget - DND status set to: \(newStatus)")
         refresh()
     }
 
     @objc func refresh() {
-        image = DoNotDisturb.isEnabled ? #imageLiteral(resourceName: "dnd-on") : #imageLiteral(resourceName: "dnd-off")
+        let isEnabled = DoNotDisturb.isEnabled
+        print("MTMR: DND widget - Refreshing, current status: \(isEnabled)")
+        image = isEnabled ? #imageLiteral(resourceName: "dnd-on") : #imageLiteral(resourceName: "dnd-off")
     }
 }
 
@@ -42,16 +49,33 @@ public struct DoNotDisturb {
     private static let dndPref = "com.apple.notificationcenterui.dndprefs_changed"
 
     @MainActor private static func set(_ key: String, value: CFPropertyList?) {
+        print("MTMR: DND widget - Setting preference '\(key)' to: \(String(describing: value))")
         CFPreferencesSetValue(key as CFString, value, appId, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
     }
 
     @MainActor private static func commitChanges() {
-        CFPreferencesSynchronize(appId, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
+        print("MTMR: DND widget - Committing DND changes to system")
+        
+        // Synchronize preferences
+        let syncResult = CFPreferencesSynchronize(appId, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
+        print("MTMR: DND widget - Preferences sync result: \(syncResult)")
+        
+        // Post notification to system
         DistributedNotificationCenter.default().postNotificationName(NSNotification.Name(dndPref), object: nil, userInfo: nil, deliverImmediately: true)
-        NSRunningApplication.runningApplications(withBundleIdentifier: appId as String).first?.terminate()
+        print("MTMR: DND widget - Posted DND change notification")
+        
+        // Restart notification center to apply changes
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: appId as String)
+        if let notificationCenter = runningApps.first {
+            print("MTMR: DND widget - Terminating notification center to apply changes")
+            notificationCenter.terminate()
+        } else {
+            print("MTMR: DND widget - Notification center not running, changes will apply on next launch")
+        }
     }
 
     @MainActor private static func enable() {
+        print("MTMR: DND widget - Enabling Do Not Disturb")
         set("dndStart", value: nil)
         set("dndEnd", value: nil)
         set("doNotDisturb", value: true as CFPropertyList)
@@ -60,6 +84,7 @@ public struct DoNotDisturb {
     }
 
     @MainActor private static func disable() {
+        print("MTMR: DND widget - Disabling Do Not Disturb")
         set("dndStart", value: nil)
         set("dndEnd", value: nil)
         set("doNotDisturb", value: false as CFPropertyList)
@@ -69,9 +94,12 @@ public struct DoNotDisturb {
 
     @MainActor static var isEnabled: Bool {
         get {
-            return CFPreferencesGetAppBooleanValue("doNotDisturb" as CFString, appId, nil)
+            let status = CFPreferencesGetAppBooleanValue("doNotDisturb" as CFString, appId, nil)
+            print("MTMR: DND widget - Current DND status: \(status)")
+            return status
         }
         set {
+            print("MTMR: DND widget - Setting DND status to: \(newValue)")
             newValue ? enable() : disable()
         }
     }
