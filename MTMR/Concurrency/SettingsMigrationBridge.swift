@@ -69,12 +69,8 @@ class SettingsMigrationBridge {
         // Access legacy settings (these are the old static properties)
         let legacySettings = AppSettings.self
         
-        // Copy to new concurrent settings
-        await ConcurrentAppSettings.showControlStripState = legacySettings.showControlStripState
-        await ConcurrentAppSettings.hapticFeedbackState = legacySettings.hapticFeedbackState
-        await ConcurrentAppSettings.multitouchGestures = legacySettings.multitouchGestures
-        await ConcurrentAppSettings.blacklistedAppIds = legacySettings.blacklistedAppIds
-        await ConcurrentAppSettings.dockPersistentAppIds = legacySettings.dockPersistentAppIds
+        // Copy to new concurrent settings using the migration function
+        await ConcurrentAppSettings.migrateFromLegacySettings()
         
         print("MTMR: Legacy settings copied successfully")
     }

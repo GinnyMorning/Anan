@@ -7,11 +7,15 @@
 //
 
 import Cocoa
+import Foundation
 import CoreLocation
 
-class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
+@MainActor
+class WeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocationManagerDelegate {
     private let activity: NSBackgroundActivityScheduler
     private var units: String
+    private var iconType: String
+    private var refreshInterval: TimeInterval
     private var prev_location: CLLocation!
     private var location: CLLocation!
     private var manager: CLLocationManager!
@@ -47,17 +51,29 @@ class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
         "foggy": "🌫️"
     ]
 
-    init(identifier: NSTouchBarItem.Identifier, interval: TimeInterval, units: String, api_key: String? = nil, icon_type: String? = "text") {
-        activity = NSBackgroundActivityScheduler(identifier: "\(identifier.rawValue).updatecheck")
-        activity.interval = interval
+    init?(identifier: NSTouchBarItem.Identifier, refreshInterval: TimeInterval, units: String, iconType: String) {
+        self.refreshInterval = refreshInterval
         self.units = units
-
-        super.init(identifier: identifier, title: "⏳")
-
-        // Initialize location manager
+        self.iconType = iconType
+        self.activity = NSBackgroundActivityScheduler(identifier: "\(identifier.rawValue).updatecheck")
+        self.activity.interval = refreshInterval
+        
+        super.init(identifier: identifier, title: "🌤️ Loading...")
+        
+        // Set up location manager
         manager = CLLocationManager()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager?.delegate = self
+        manager?.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        
+        // Set up background activity
+        activity.repeats = true
+        activity.qualityOfService = .utility
+        activity.schedule { (completion: NSBackgroundActivityScheduler.CompletionHandler) in
+            DispatchQueue.main.async {
+                self.updateWeather()
+            }
+            completion(NSBackgroundActivityScheduler.Result.finished)
+        }
         
         // Check location permissions
         let status = CLLocationManager.authorizationStatus()
@@ -91,17 +107,6 @@ class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
             print("MTMR: Weather widget - Unexpected authorization status, using default location")
             useDefaultLocation()
         }
-
-        // Set up background activity
-        activity.repeats = true
-        activity.qualityOfService = .utility
-        activity.schedule { (completion: NSBackgroundActivityScheduler.CompletionHandler) in
-            self.updateWeather()
-            completion(NSBackgroundActivityScheduler.Result.finished)
-        }
-        
-        // Initial weather update
-        updateWeather()
     }
     
     private func useDefaultLocation() {
@@ -156,6 +161,7 @@ class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
         print("MTMR: Weather widget - Fetching weather from: \(url)")
         
         let urlRequest = URLRequest(url: url)
+        let unitsValue = units // Capture the value before the closure
         let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             
             if let error = error {
@@ -194,55 +200,55 @@ class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
                         print("MTMR: Weather widget - API error: \(reason)")
                         DispatchQueue.main.async {
                             self.setWeather(text: "🌤️ API Error")
+                            self.lastError = reason
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.setWeather(text: "🌤️ API Error")
                         }
                     }
                     return
                 }
                 
-                // Parse current weather data
+                // Parse weather data
                 guard let current = json["current"] as? [String: AnyObject] else {
-                    print("MTMR: Weather widget - Invalid current weather data")
+                    print("MTMR: Weather widget - No current weather data")
                     DispatchQueue.main.async {
-                        self.setWeather(text: "🌤️ Data Error")
+                        self.setWeather(text: "🌤️ No Data")
                     }
                     return
                 }
                 
-                // Extract temperature
                 let temperature = current["temperature_2m"] as? Double ?? 0.0
-                
-                // Extract precipitation data
                 let precipitation = current["precipitation"] as? Double ?? 0.0
                 let rain = current["rain"] as? Double ?? 0.0
                 let isDay = current["is_day"] as? Double ?? 1.0
                 
-                // Determine weather icon based on conditions
-                let weatherIcon = self.getWeatherIcon(precipitation: precipitation, rain: rain, isDay: isDay)
-                
                 // Format temperature with proper unit
-                let tempUnit = self.units == "metric" ? "°C" : "°F"
+                let tempUnit = unitsValue == "metric" ? "°C" : "°F"
                 let formattedTemp = String(format: "%.0f", temperature)
                 
-                // Create weather display text
-                var weatherText = "\(weatherIcon) \(formattedTemp)\(tempUnit)"
-                
-                // Add precipitation info if significant
-                if precipitation > 0.1 || rain > 0.1 {
-                    let precipValue = max(precipitation, rain)
-                    if precipValue > 5.0 {
-                        weatherText += " 🌧️"
-                    } else if precipValue > 0.5 {
-                        weatherText += " 💧"
-                    }
-                }
-                
+                // Determine weather icon and create display text on main actor
                 DispatchQueue.main.async {
+                    let weatherIcon = self.getWeatherIcon(precipitation: precipitation, rain: rain, isDay: isDay)
+                    var weatherText = "\(weatherIcon) \(formattedTemp)\(tempUnit)"
+                    
+                    // Add precipitation info if significant
+                    if precipitation > 0.1 || rain > 0.1 {
+                        let precipValue = max(precipitation, rain)
+                        if precipValue > 5.0 {
+                            weatherText += " 🌧️"
+                        } else if precipValue > 0.5 {
+                            weatherText += " 💧"
+                        }
+                    }
+                    
                     self.setWeather(text: weatherText)
                     self.lastError = nil
+                    
+                    print("MTMR: Weather widget - Updated: \(weatherText)")
+                    print("MTMR: Weather widget - Raw data: temp=\(temperature), precip=\(precipitation), rain=\(rain), isDay=\(isDay)")
                 }
-                
-                print("MTMR: Weather widget - Updated: \(weatherText)")
-                print("MTMR: Weather widget - Raw data: temp=\(temperature), precip=\(precipitation), rain=\(rain), isDay=\(isDay)")
                 
             } catch let jsonError {
                 print("MTMR: Weather widget - JSON parsing error: \(jsonError.localizedDescription)")
@@ -279,7 +285,9 @@ class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
         print("MTMR: Weather widget - Location updated: \(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude)")
         
         if prev_location == nil {
-            updateWeather()
+            DispatchQueue.main.async {
+                self.updateWeather()
+            }
         }
         prev_location = lastLocation
     }
@@ -312,14 +320,23 @@ class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
         case .denied, .restricted:
             setWeather(text: "🌤️ Location Denied")
         case .notDetermined:
-            setWeather(text: "🌤️ Location Pending")
+            if #available(macOS 10.15, *) {
+                manager?.requestWhenInUseAuthorization()
+            } else {
+                // For older macOS versions, try to start updates directly
+                startLocationUpdates()
+            }
+        case .authorizedWhenInUse:
+            if !isInitialized {
+                startLocationUpdates()
+            }
         @unknown default:
-            setWeather(text: "🌤️ Location Unknown")
+            print("MTMR: Weather widget - Unknown authorization status: \(status.rawValue)")
         }
     }
     
     deinit {
-        activity.invalidate()
-        manager?.stopUpdatingLocation()
+        // Note: Cannot access @MainActor properties in deinit
+        // The manager will be cleaned up automatically when the object is deallocated
     }
 }

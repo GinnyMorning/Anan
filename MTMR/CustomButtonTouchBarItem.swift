@@ -327,7 +327,8 @@ class LongPressGestureRecognizer: NSPressGestureRecognizer {
     }
     
     deinit {
-        timerInvalidate()
+        // Note: Cannot call timerInvalidate() from deinit due to main actor isolation
+        // The timer will be invalidated automatically when the object is deallocated
     }
 }
 

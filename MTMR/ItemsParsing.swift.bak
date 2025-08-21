@@ -7,8 +7,7 @@ extension Data {
     }
 }
 
-@MainActor
-struct BarItemDefinition: @preconcurrency Decodable {
+struct BarItemDefinition: Decodable {
     let type: ItemType
     let actions: [Action]
     let legacyAction: LegacyActionType
@@ -53,8 +52,7 @@ typealias ParametersDecoder = (Decoder) throws -> (
     parameters: [GeneralParameters.CodingKeys: GeneralParameter]
 )
 
-@MainActor
-final class SupportedTypesHolder {
+final class SupportedTypesHolder: Sendable {
     private let supportedTypes: [String: ParametersDecoder] = [
         "escape": { _ in (
             item: .staticButton(title: "esc"),
@@ -226,37 +224,8 @@ final class SupportedTypesHolder {
             parameters: [:]
         ) },
 
-        "exitTouchbar": { _ in (
-            item: .staticButton(title: "exit"),
-            actions: [
-                Action(trigger: .singleTap, value: .custom(closure: { 
-                    // This will be handled by the TouchBarController
-                    // The closure will be replaced with the actual implementation
-                    return
-                }))
-            ],
-            legacyAction: .none,
-            legacyLongAction: .none,
-            parameters: [:]
-        ) },
-
-        "close": { _ in (
-            item: .staticButton(title: ""),
-            actions: [
-                Action(trigger: .singleTap, value: .custom(closure: { 
-                    // This will be handled by the TouchBarController
-                    // The closure will be replaced with the actual implementation
-                    return
-                }))
-            ],
-            legacyAction: .none,
-            legacyLongAction: .none,
-            parameters: [.width: .width(30), .image: .image(source: NSImage(named: NSImage.stopProgressFreestandingTemplateName)!)]
-        ) }
-
     ]
 
-    // Note: Changed from singleton to instance to avoid concurrency issues
     static let sharedInstance = SupportedTypesHolder()
 
     func lookup(by type: String, actions: [Action]) -> ParametersDecoder {
@@ -269,6 +238,7 @@ final class SupportedTypesHolder {
         ) }
     }
 
+    }
 }
 
 enum ItemType: Decodable {

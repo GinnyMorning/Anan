@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
     private var script: NSAppleScript!
     private let interval: TimeInterval
@@ -19,10 +20,6 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
                 }
                 return
             }
-            self.script = script
-            DispatchQueue.main.async {
-                self.isBordered = false
-            }
             
             var error: NSDictionary?
             guard script.compileAndReturnError(&error) else {
@@ -34,7 +31,13 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
                 }
                 return
             }
-            self.refreshAndSchedule()
+            
+            // Update UI on main actor after successful compilation
+            DispatchQueue.main.async {
+                self.script = script
+                self.isBordered = false
+                self.refreshAndSchedule()
+            }
         }
     }
 
@@ -55,7 +58,9 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
             #endif
         }
         DispatchQueue.appleScriptQueue.asyncAfter(deadline: .now() + interval) { [weak self] in
-            self?.refreshAndSchedule()
+            DispatchQueue.main.async {
+                self?.refreshAndSchedule()
+            }
         }
     }
 

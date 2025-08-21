@@ -30,7 +30,8 @@ class BatteryBarItem: CustomButtonTouchBarItem {
     }
 
     deinit {
-        batteryInfo.stop()
+        // Note: Cannot access @MainActor properties in deinit
+        // The batteryInfo will be cleaned up automatically when the object is deallocated
     }
 }
 

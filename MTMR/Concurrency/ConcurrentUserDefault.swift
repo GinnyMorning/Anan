@@ -64,8 +64,6 @@ struct ConcurrentAppSettings {
     static var dockPersistentAppIds: [String]
     
     /// Migration helper: Copy values from old AppSettings
-    /// Note: This function will be uncommented after AppSettings migration
-    /*
     static func migrateFromLegacySettings() async {
         // This will be called during migration to preserve user settings
         let legacySettings = AppSettings.self
@@ -76,5 +74,4 @@ struct ConcurrentAppSettings {
         blacklistedAppIds = legacySettings.blacklistedAppIds
         dockPersistentAppIds = legacySettings.dockPersistentAppIds
     }
-    */
 }

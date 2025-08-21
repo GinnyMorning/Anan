@@ -9,6 +9,7 @@
 import Foundation
 import Foundation
 
+@MainActor
 class SwipeItem: NSCustomTouchBarItem {
     private var scriptApple: NSAppleScript?
     private var scriptBash: String?
@@ -38,17 +39,19 @@ class SwipeItem: NSCustomTouchBarItem {
     }
 
     func execute() {
-        if scriptApple != nil {
+        if let scriptApple = scriptApple {
+            let script = scriptApple // Capture the value
             DispatchQueue.appleScriptQueue.async {
                 var error: NSDictionary?
-                self.scriptApple?.executeAndReturnError(&error)
+                script.executeAndReturnError(&error)
                 if let error = error {
                     print("SwipeItem apple script error: \(error)")
                     return
                 }
             }
         }
-        if scriptBash != nil {
+        if let scriptBash = scriptBash {
+            let script = scriptBash // Capture the value
             DispatchQueue.shellScriptQueue.async {
                 let task = Process()
                 if let shell = getenv("SHELL") {
@@ -56,7 +59,7 @@ class SwipeItem: NSCustomTouchBarItem {
                 } else {
                     task.launchPath = "/bin/bash"
                 }
-                task.arguments = ["-c", self.scriptBash!]
+                task.arguments = ["-c", script]
                 task.launch()
                 task.waitUntilExit()
 

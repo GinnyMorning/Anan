@@ -17,7 +17,7 @@ let appSupportDirectory = NSSearchPathForDirectoriesInDomains(.applicationSuppor
 let standardConfigPath = appSupportDirectory.appending("/items.json")
 
 extension ItemType {
-    var identifierBase: String {
+    @MainActor var identifierBase: String {
         switch self {
         case .staticButton(title: _):
             return "com.toxblh.mtmr.staticButton."
@@ -71,6 +71,7 @@ extension NSTouchBarItem.Identifier {
     static let controlStripItem = NSTouchBarItem.Identifier("com.toxblh.mtmr.controlStrip")
 }
 
+@MainActor
 class TouchBarController: NSObject, NSTouchBarDelegate {
     static let shared = TouchBarController()
 
@@ -94,30 +95,10 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
 
     private override init() {
         super.init()
-        SupportedTypesHolder.sharedInstance.register(
-            typename: "exitTouchbar",
-            item: .staticButton(title: "exit"),
-            actions: [
-                Action(trigger: .singleTap, value: .custom(closure: { [weak self] in self?.dismissTouchBar() }))
-            ],
-            legacyAction: .none,
-            legacyLongAction: .none
-        )
-
-        SupportedTypesHolder.sharedInstance.register(typename: "close") { _ in
-            (
-                item: .staticButton(title: ""),
-                actions: [
-                    Action(trigger: .singleTap, value: .custom(closure: { [weak self] in
-                        guard let `self` = self else { return }
-                        self.reloadPreset(path: self.lastPresetPath)
-                    }))
-                ],
-                legacyAction: .none,
-                legacyLongAction: .none,
-                parameters: [.width: .width(30), .image: .image(source: (NSImage(named: NSImage.stopProgressFreestandingTemplateName))!)])
-        }
-
+        
+        // Note: Registration is now handled by SupportedTypesHolder's immutable dictionary
+        // The "exitTouchbar" and "close" types are defined in the supportedTypes dictionary
+        
         blacklistAppIdentifiers = AppSettings.blacklistedAppIds
 
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeApplicationChanged), name: NSWorkspace.didLaunchApplicationNotification, object: nil)
@@ -199,8 +180,10 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         basicView?.legacyGesturesEnabled = AppSettings.multitouchGestures
     }
 
-    @objc func activeApplicationChanged(_: Notification) {
-        updateActiveApp()
+    @objc nonisolated func activeApplicationChanged(_: Notification) {
+        DispatchQueue.main.async {
+            self.updateActiveApp()
+        }
     }
 
     func updateActiveApp() {
@@ -285,12 +268,14 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         }
     }
 
-    @objc func setupControlStripPresence() {
-        DFRSystemModalShowsCloseBoxWhenFrontMost(false)
-        let item = NSCustomTouchBarItem(identifier: .controlStripItem)
-        item.view = NSButton(image: #imageLiteral(resourceName: "StatusImage"), target: self, action: #selector(presentTouchBar))
-        NSTouchBarItem.addSystemTrayItem(item)
-        updateControlStripPresence()
+    @objc nonisolated func setupControlStripPresence() {
+        DispatchQueue.main.async {
+            DFRSystemModalShowsCloseBoxWhenFrontMost(false)
+            let item = NSCustomTouchBarItem(identifier: .controlStripItem)
+            item.view = NSButton(image: #imageLiteral(resourceName: "StatusImage"), target: self, action: #selector(self.presentTouchBar))
+            NSTouchBarItem.addSystemTrayItem(item)
+            self.updateControlStripPresence()
+        }
     }
 
     func updateControlStripPresence() {
@@ -298,25 +283,31 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         DFRElementSetControlStripPresenceForIdentifier(.controlStripItem, showMtmrButtonOnControlStrip)
     }
 
-    @objc private func presentTouchBar() {
-        if AppSettings.showControlStripState {
-            presentSystemModal(touchBar, systemTrayItemIdentifier: .controlStripItem)
-        } else {
-            presentSystemModal(touchBar, placement: 1, systemTrayItemIdentifier: .controlStripItem)
+    @objc private nonisolated func presentTouchBar() {
+        DispatchQueue.main.async {
+            if AppSettings.showControlStripState {
+                presentSystemModal(self.touchBar, systemTrayItemIdentifier: .controlStripItem)
+            } else {
+                presentSystemModal(self.touchBar, placement: 1, systemTrayItemIdentifier: .controlStripItem)
+            }
+            self.updateControlStripPresence()
         }
-        updateControlStripPresence()
     }
 
-    @objc private func dismissTouchBar() {
-        if touchBarContainsAnyItems() {
-            minimizeSystemModal(touchBar)
+    @objc private nonisolated func dismissTouchBar() {
+        DispatchQueue.main.async {
+            if self.touchBarContainsAnyItems() {
+                minimizeSystemModal(self.touchBar)
+            }
+            self.updateControlStripPresence()
         }
-        updateControlStripPresence()
     }
 
-    @objc func resetControlStrip() {
-        dismissTouchBar()
-        updateActiveApp()
+    @objc nonisolated func resetControlStrip() {
+        DispatchQueue.main.async {
+            self.dismissTouchBar()
+            self.updateActiveApp()
+        }
     }
 
     func touchBar(_: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
@@ -364,8 +355,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             } else {
                 barItem = BrightnessViewController(identifier: identifier, refreshInterval: interval)
             }
-        case let .weather(interval: interval, units: units, api_key: api_key, icon_type: icon_type):
-            barItem = WeatherBarItem(identifier: identifier, interval: interval, units: units, api_key: api_key, icon_type: icon_type)
+        case let .weather(interval: interval, units: units, api_key: _, icon_type: icon_type):
+            barItem = WeatherBarItem(identifier: identifier, refreshInterval: interval, units: units, iconType: icon_type ?? "text")
         case let .yandexWeather(interval: interval):
             barItem = YandexWeatherBarItem(identifier: identifier, interval: interval)
         case let .currency(interval: interval, from: from, to: to, full: full):
@@ -562,14 +553,18 @@ protocol CanSetWidth {
 }
 
 extension NSCustomTouchBarItem: CanSetWidth {
-    func setWidth(value: CGFloat) {
-        view.widthAnchor.constraint(equalToConstant: value).isActive = true
+    nonisolated func setWidth(value: CGFloat) {
+        DispatchQueue.main.async {
+            self.view.widthAnchor.constraint(equalToConstant: value).isActive = true
+        }
     }
 }
 
 extension NSPopoverTouchBarItem: CanSetWidth {
-    func setWidth(value: CGFloat) {
-        view?.widthAnchor.constraint(equalToConstant: value).isActive = true
+    nonisolated func setWidth(value: CGFloat) {
+        DispatchQueue.main.async {
+            self.view?.widthAnchor.constraint(equalToConstant: value).isActive = true
+        }
     }
 }
 

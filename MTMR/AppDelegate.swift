@@ -10,6 +10,7 @@ import Cocoa
 import Sparkle
 
 @main
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     var isBlockedApp: Bool = false
@@ -22,7 +23,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SUUpdater.shared().automaticallyChecksForUpdates = true
         SUUpdater.shared().checkForUpdatesInBackground()
 
-        AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue() as NSString: true] as NSDictionary)
+        // Request accessibility permissions with prompt
+        // Note: Using hardcoded constant to avoid concurrency issues with system constant
+        let options: NSDictionary = [
+            "AXTrustedCheckOptionPrompt": true
+        ]
+        AXIsProcessTrustedWithOptions(options)
 
         TouchBarController.shared.setupControlStripPresence()
 
