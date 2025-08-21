@@ -41,17 +41,17 @@ public struct DoNotDisturb {
     @MainActor private static let appId = "com.apple.notificationcenterui" as CFString
     private static let dndPref = "com.apple.notificationcenterui.dndprefs_changed"
 
-    private static func set(_ key: String, value: CFPropertyList?) {
+    @MainActor private static func set(_ key: String, value: CFPropertyList?) {
         CFPreferencesSetValue(key as CFString, value, appId, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
     }
 
-    private static func commitChanges() {
+    @MainActor private static func commitChanges() {
         CFPreferencesSynchronize(appId, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
         DistributedNotificationCenter.default().postNotificationName(NSNotification.Name(dndPref), object: nil, userInfo: nil, deliverImmediately: true)
         NSRunningApplication.runningApplications(withBundleIdentifier: appId as String).first?.terminate()
     }
 
-    private static func enable() {
+    @MainActor private static func enable() {
         set("dndStart", value: nil)
         set("dndEnd", value: nil)
         set("doNotDisturb", value: true as CFPropertyList)
@@ -59,7 +59,7 @@ public struct DoNotDisturb {
         commitChanges()
     }
 
-    private static func disable() {
+    @MainActor private static func disable() {
         set("dndStart", value: nil)
         set("dndEnd", value: nil)
         set("doNotDisturb", value: false as CFPropertyList)
@@ -67,7 +67,7 @@ public struct DoNotDisturb {
         commitChanges()
     }
 
-    static var isEnabled: Bool {
+    @MainActor static var isEnabled: Bool {
         get {
             return CFPreferencesGetAppBooleanValue("doNotDisturb" as CFString, appId, nil)
         }

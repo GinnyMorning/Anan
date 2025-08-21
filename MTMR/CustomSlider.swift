@@ -78,9 +78,11 @@ class CustomSlider: NSSlider {
 
     override func awakeFromNib() {
         super.awakeFromNib()
-        if (cell?.isKind(of: CustomSliderCell.self)) == false {
-            let cell: CustomSliderCell = CustomSliderCell()
-            self.cell = cell
+        DispatchQueue.main.async {
+            if (self.cell?.isKind(of: CustomSliderCell.self)) == false {
+                let cell: CustomSliderCell = CustomSliderCell()
+                self.cell = cell
+            }
         }
     }
 

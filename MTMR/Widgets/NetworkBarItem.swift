@@ -15,6 +15,8 @@ class NetworkBarItem: CustomButtonTouchBarItem, @preconcurrency Widget {
     
     private let flip: Bool
     private let units: String
+    private var dataAvailableObserver: NSObjectProtocol?
+    private var dataReadyObserver: NSObjectProtocol?
     
     init(identifier: NSTouchBarItem.Identifier, flip: Bool = false, units: String) {
         self.flip = flip
@@ -26,65 +28,89 @@ class NetworkBarItem: CustomButtonTouchBarItem, @preconcurrency Widget {
     required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+    
+    deinit {
+        // Note: Cannot access @MainActor properties in deinit
+        // The observers will be cleaned up automatically when the object is deallocated
+    }
 
     func startMonitoringProcess() {
-        var pipe: Pipe
-        var outputHandle: FileHandle
-        var bandwidthProcess: Process?
-        var dSpeed: UInt64?
-        var uSpeed: UInt64?
-        var curr: Array<Substring>?
-        var dataAvailable: NSObjectProtocol?
+        let pipe = Pipe()
+        let bandwidthProcess = Process()
+        bandwidthProcess.launchPath = "/usr/bin/env"
+        bandwidthProcess.arguments = ["netstat", "-w1", "-l", "en0"]
+        bandwidthProcess.standardOutput = pipe
 
-        pipe = Pipe()
-        bandwidthProcess = Process()
-        bandwidthProcess?.launchPath = "/usr/bin/env"
-        bandwidthProcess?.arguments = ["netstat", "-w1", "-l", "en0"]
-        bandwidthProcess?.standardOutput = pipe
-
-        outputHandle = pipe.fileHandleForReading
+        let outputHandle = pipe.fileHandleForReading
         outputHandle.waitForDataInBackgroundAndNotify(forModes: [RunLoop.Mode.common])
 
-        dataAvailable = NotificationCenter.default.addObserver(
+        // Capture weak self to avoid retain cycles
+        dataAvailableObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name.NSFileHandleDataAvailable,
             object: outputHandle,
             queue: nil
-        ) { _ -> Void in
+        ) { [weak self] _ -> Void in
+            guard let self = self else { return }
+            
             let data = pipe.fileHandleForReading.availableData
             if data.count > 0 {
                 if let str = NSString(data: data, encoding: String.Encoding.utf8.rawValue) {
-                    curr = [""]
-                    curr = str
+                    // Process data in background and then update UI on main actor
+                    let processedData = str
                         .replacingOccurrences(of: "  ", with: " ")
                         .split(separator: " ")
-                    if curr == nil || (curr?.count)! < 6 {} else {
-                        if Int64(curr![2]) == nil {} else {
-                            dSpeed = UInt64(curr![2])
-                            uSpeed = UInt64(curr![5])
-
-                            self.setTitle(up: self.getHumanizeSize(speed: uSpeed!), down: self.getHumanizeSize(speed: dSpeed!))
+                    
+                    if processedData.count >= 6,
+                       let downSpeed = UInt64(processedData[2]),
+                       let upSpeed = UInt64(processedData[5]) {
+                        
+                        // Update UI on main actor
+                        DispatchQueue.main.async {
+                            self.updateNetworkSpeeds(upSpeed: upSpeed, downSpeed: downSpeed)
                         }
                     }
                 }
                 outputHandle.waitForDataInBackgroundAndNotify()
-            } else if let dataAvailable = dataAvailable {
-                NotificationCenter.default.removeObserver(dataAvailable)
+            } else {
+                // Clean up observer when no more data
+                DispatchQueue.main.async {
+                    self.cleanupDataAvailableObserver()
+                }
             }
         }
 
-        var dataReady: NSObjectProtocol?
-        dataReady = NotificationCenter.default.addObserver(
+        dataReadyObserver = NotificationCenter.default.addObserver(
             forName: Process.didTerminateNotification,
             object: outputHandle,
             queue: nil
-        ) { _ -> Void in
+        ) { [weak self] _ -> Void in
             print("Task terminated!")
-            if let observer = dataReady {
-                NotificationCenter.default.removeObserver(observer)
+            DispatchQueue.main.async {
+                self?.cleanupDataReadyObserver()
             }
         }
 
-        bandwidthProcess?.launch()
+        bandwidthProcess.launch()
+    }
+    
+    private func updateNetworkSpeeds(upSpeed: UInt64, downSpeed: UInt64) {
+        let upSpeedText = getHumanizeSize(speed: upSpeed)
+        let downSpeedText = getHumanizeSize(speed: downSpeed)
+        setTitle(up: upSpeedText, down: downSpeedText)
+    }
+    
+    private func cleanupDataAvailableObserver() {
+        if let observer = dataAvailableObserver {
+            NotificationCenter.default.removeObserver(observer)
+            dataAvailableObserver = nil
+        }
+    }
+    
+    private func cleanupDataReadyObserver() {
+        if let observer = dataReadyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            dataReadyObserver = nil
+        }
     }
 
     func getHumanizeSize(speed: UInt64) -> String {

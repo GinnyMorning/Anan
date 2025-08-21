@@ -20,10 +20,6 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
                 }
                 return
             }
-            DispatchQueue.main.async {
-                self.script = script
-                self.isBordered = false
-            }
             
             var error: NSDictionary?
             guard script.compileAndReturnError(&error) else {
@@ -35,7 +31,11 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
                 }
                 return
             }
+            
+            // Update UI on main actor after successful compilation
             DispatchQueue.main.async {
+                self.script = script
+                self.isBordered = false
                 self.refreshAndSchedule()
             }
         }

@@ -224,33 +224,31 @@ class WeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocationManage
                 let rain = current["rain"] as? Double ?? 0.0
                 let isDay = current["is_day"] as? Double ?? 1.0
                 
-                // Determine weather icon based on conditions
-                let weatherIcon = self.getWeatherIcon(precipitation: precipitation, rain: rain, isDay: isDay)
-                
                 // Format temperature with proper unit
                 let tempUnit = unitsValue == "metric" ? "°C" : "°F"
                 let formattedTemp = String(format: "%.0f", temperature)
                 
-                // Create weather display text
-                var weatherText = "\(weatherIcon) \(formattedTemp)\(tempUnit)"
-                
-                // Add precipitation info if significant
-                if precipitation > 0.1 || rain > 0.1 {
-                    let precipValue = max(precipitation, rain)
-                    if precipValue > 5.0 {
-                        weatherText += " 🌧️"
-                    } else if precipValue > 0.5 {
-                        weatherText += " 💧"
-                    }
-                }
-                
+                // Determine weather icon and create display text on main actor
                 DispatchQueue.main.async {
+                    let weatherIcon = self.getWeatherIcon(precipitation: precipitation, rain: rain, isDay: isDay)
+                    var weatherText = "\(weatherIcon) \(formattedTemp)\(tempUnit)"
+                    
+                    // Add precipitation info if significant
+                    if precipitation > 0.1 || rain > 0.1 {
+                        let precipValue = max(precipitation, rain)
+                        if precipValue > 5.0 {
+                            weatherText += " 🌧️"
+                        } else if precipValue > 0.5 {
+                            weatherText += " 💧"
+                        }
+                    }
+                    
                     self.setWeather(text: weatherText)
                     self.lastError = nil
+                    
+                    print("MTMR: Weather widget - Updated: \(weatherText)")
+                    print("MTMR: Weather widget - Raw data: temp=\(temperature), precip=\(precipitation), rain=\(rain), isDay=\(isDay)")
                 }
-                
-                print("MTMR: Weather widget - Updated: \(weatherText)")
-                print("MTMR: Weather widget - Raw data: temp=\(temperature), precip=\(precipitation), rain=\(rain), isDay=\(isDay)")
                 
             } catch let jsonError {
                 print("MTMR: Weather widget - JSON parsing error: \(jsonError.localizedDescription)")

@@ -23,7 +23,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SUUpdater.shared().automaticallyChecksForUpdates = true
         SUUpdater.shared().checkForUpdatesInBackground()
 
-        AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeRetainedValue() as NSString: true] as NSDictionary)
+        // Request accessibility permissions with prompt
+        // Note: Using hardcoded constant to avoid concurrency issues with system constant
+        let options: NSDictionary = [
+            "AXTrustedCheckOptionPrompt": true
+        ]
+        AXIsProcessTrustedWithOptions(options)
 
         TouchBarController.shared.setupControlStripPresence()
 
