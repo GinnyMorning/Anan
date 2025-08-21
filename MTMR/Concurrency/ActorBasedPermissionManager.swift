@@ -3,16 +3,24 @@
 //  MTMR
 //
 //  Created for Swift 6.0 Migration
-//  Thread-safe permission management using actors
+//  Actor-based permission manager for thread safety
 //
 
 import Foundation
 import AppKit
 import CoreLocation
+import CoreAudio
+import IOKit
 
-/// Thread-safe permission manager using Swift 6.0 actors
+/// Actor-based permission manager for Swift 6.0 concurrency
+/// This provides thread-safe permission management using Swift actors
 actor ActorBasedPermissionManager {
+    
+    // MARK: - Singleton Pattern (Actor-Isolated)
+    
     static let shared = ActorBasedPermissionManager()
+    
+    // MARK: - Properties
     
     private let userDefaults = UserDefaults.standard
     private let permissionCheckInterval: TimeInterval = 3600 // Check every hour
@@ -33,14 +41,22 @@ actor ActorBasedPermissionManager {
         case unavailable = "unavailable"
     }
     
-    private init() {}
+    // Permission cache for performance
+    private var permissionCache: [String: PermissionState] = [:]
+    private var lastCheckTime: Date?
+    
+    private init() {
+        // Load cached permissions on initialization
+        loadCachedPermissions()
+    }
     
     // MARK: - Smart Permission Checking
     
     func shouldCheckPermissions() -> Bool {
-        let lastCheck = userDefaults.object(forKey: lastPermissionCheckKey) as? Date ?? Date.distantPast
+        let lastCheck = lastCheckTime ?? userDefaults.object(forKey: lastPermissionCheckKey) as? Date ?? Date.distantPast
         let timeSinceLastCheck = Date().timeIntervalSince(lastCheck)
         
+        // Only check permissions if enough time has passed or if we haven't checked before
         return timeSinceLastCheck >= permissionCheckInterval || lastCheck == Date.distantPast
     }
     
@@ -52,139 +68,321 @@ actor ActorBasedPermissionManager {
             "brightness": await checkBrightnessPermission()
         ]
         
-        // Update last check time
-        userDefaults.set(Date(), forKey: lastPermissionCheckKey)
+        // Update cache and last check time
+        permissionCache = permissions
+        lastCheckTime = Date()
+        userDefaults.set(lastCheckTime, forKey: lastPermissionCheckKey)
         
         return permissions
     }
     
     // MARK: - Individual Permission Checks
     
-    private func checkAccessibilityPermission() async -> PermissionState {
-        // Check cached state first
-        if let cachedState = getCachedPermissionState(for: accessibilityPermissionKey) {
-            return cachedState
+    func checkAccessibilityPermission() async -> PermissionState {
+        // Check if we have a cached result
+        if let cached = permissionCache["accessibility"] {
+            return cached
         }
         
-        // Check actual permission
-        let isGranted = await MainActor.run {
-            AXIsProcessTrusted()
+        // Perform the check on the main actor since it involves UI operations
+        let state = await MainActor.run {
+            let trusted = AXIsProcessTrusted()
+            let permissionState: PermissionState = trusted ? .granted : .denied
+            
+            // Cache the result
+            userDefaults.set(permissionState.rawValue, forKey: accessibilityPermissionKey)
+            
+            return permissionState
         }
         
-        let state: PermissionState = isGranted ? .granted : .denied
-        setCachedPermissionState(state, for: accessibilityPermissionKey)
+        // Update cache
+        permissionCache["accessibility"] = state
         
         return state
     }
     
-    private func checkLocationPermission() async -> PermissionState {
-        if let cachedState = getCachedPermissionState(for: locationPermissionKey) {
-            return cachedState
+    func checkLocationPermission() async -> PermissionState {
+        // Check if we have a cached result
+        if let cached = permissionCache["location"] {
+            return cached
         }
         
-        let authStatus = await MainActor.run {
-            CLLocationManager.authorizationStatus()
-        }
-        
+        let status = CLLocationManager.authorizationStatus()
         let state: PermissionState
-        switch authStatus {
-        case .authorizedAlways:
-            state = .granted
-        case .denied:
-            state = .denied
-        case .restricted:
-            state = .restricted
+        
+        switch status {
         case .notDetermined:
             state = .notDetermined
+        case .restricted:
+            state = .restricted
+        case .denied:
+            state = .denied
+        case .authorizedWhenInUse, .authorizedAlways:
+            state = .granted
         @unknown default:
             state = .unavailable
         }
         
-        setCachedPermissionState(state, for: locationPermissionKey)
+        // Cache the result
+        userDefaults.set(state.rawValue, forKey: locationPermissionKey)
+        permissionCache["location"] = state
+        
         return state
     }
     
-    private func checkAudioPermission() async -> PermissionState {
-        if let cachedState = getCachedPermissionState(for: audioPermissionKey) {
-            return cachedState
+    func checkAudioPermission() async -> PermissionState {
+        // Check if we have a cached result
+        if let cached = permissionCache["audio"] {
+            return cached
         }
         
-        // For audio, we assume granted if we can access system volume
-        // This is a simplified check - in reality, you might want more sophisticated checking
-        let state: PermissionState = .granted
-        setCachedPermissionState(state, for: audioPermissionKey)
+        let canAccessAudio = await canAccessAudioSystem()
+        let state: PermissionState = canAccessAudio ? .granted : .denied
+        
+        // Cache the result
+        userDefaults.set(state.rawValue, forKey: audioPermissionKey)
+        permissionCache["audio"] = state
         
         return state
     }
     
-    private func checkBrightnessPermission() async -> PermissionState {
-        if let cachedState = getCachedPermissionState(for: brightnessPermissionKey) {
-            return cachedState
+    func checkBrightnessPermission() async -> PermissionState {
+        // Check if we have a cached result
+        if let cached = permissionCache["brightness"] {
+            return cached
         }
         
-        // For brightness, we assume granted if we can access display controls
-        let state: PermissionState = .granted
-        setCachedPermissionState(state, for: brightnessPermissionKey)
+        let canAccessBrightness = await canAccessBrightnessSystem()
+        let state: PermissionState = canAccessBrightness ? .granted : .denied
+        
+        // Cache the result
+        userDefaults.set(state.rawValue, forKey: brightnessPermissionKey)
+        permissionCache["brightness"] = state
         
         return state
     }
     
-    // MARK: - Smart Request Logic
+    // MARK: - Permission Request Methods
     
-    func requestPermissionIfNeeded(for type: String) async -> Bool {
-        let permissions = await checkAllPermissions()
-        guard let currentState = permissions[type] else { return false }
+    func requestAccessibilityPermission() async {
+        await MainActor.run {
+            let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as NSString: true]
+            AXIsProcessTrustedWithOptions(options as CFDictionary)
+        }
+    }
+    
+    func requestLocationPermission() async {
+        await MainActor.run {
+            let locationManager = CLLocationManager()
+            if #available(macOS 10.15, *) {
+                locationManager.requestWhenInUseAuthorization()
+            } else {
+                // For older macOS versions, just start updates
+                locationManager.startUpdatingLocation()
+            }
+        }
+    }
+    
+    // MARK: - Permission Status Methods
+    
+    func getCachedPermissionState(for permission: String) -> PermissionState {
+        // First check our in-memory cache
+        if let cached = permissionCache[permission] {
+            return cached
+        }
         
-        switch currentState {
-        case .granted:
+        // Fall back to UserDefaults
+        let key = "com.toxblh.mtmr.\(permission)Permission"
+        let rawValue = userDefaults.string(forKey: key) ?? PermissionState.notDetermined.rawValue
+        let state = PermissionState(rawValue: rawValue) ?? .notDetermined
+        
+        // Update cache
+        permissionCache[permission] = state
+        
+        return state
+    }
+    
+    func isPermissionGranted(for permission: String) -> Bool {
+        return getCachedPermissionState(for: permission) == .granted
+    }
+    
+    // MARK: - Smart Permission Requests
+    
+    func smartRequestPermission(for permission: String) async -> Bool {
+        // Check if we already have permission
+        if isPermissionGranted(for: permission) {
             return true
-        case .notDetermined:
-            return await requestPermission(for: type)
-        case .denied, .restricted, .unavailable:
+        }
+        
+        // Check if we should ask again (avoid spam)
+        let lastRequestKey = "com.toxblh.mtmr.lastRequest.\(permission)"
+        let lastRequest = userDefaults.object(forKey: lastRequestKey) as? Date ?? Date.distantPast
+        let timeSinceLastRequest = Date().timeIntervalSince(lastRequest)
+        
+        // Only ask once per day
+        if timeSinceLastRequest < 86400 { // 24 hours
             return false
         }
-    }
-    
-    private func requestPermission(for type: String) async -> Bool {
-        switch type {
+        
+        // Update last request time
+        userDefaults.set(Date(), forKey: lastRequestKey)
+        
+        // Request permission
+        switch permission {
         case "accessibility":
-            return await requestAccessibilityPermission()
+            await requestAccessibilityPermission()
         case "location":
-            return await requestLocationPermission()
+            await requestLocationPermission()
         default:
             return false
         }
+        
+        return true
     }
     
-    private func requestAccessibilityPermission() async -> Bool {
-        return await MainActor.run {
-            let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as NSString: true] as NSDictionary
-            return AXIsProcessTrustedWithOptions(options)
+    // MARK: - Permission Status Display
+    
+    func getPermissionStatusSummary() async -> String {
+        let permissions = await checkAllPermissions()
+        var summary = "Permission Status:\n"
+        
+        for (permission, state) in permissions {
+            let status = state == .granted ? "✅" : "❌"
+            summary += "  \(permission.capitalized): \(status) \(state.rawValue)\n"
+        }
+        
+        return summary
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func canAccessAudioSystem() async -> Bool {
+        // Try to get the default audio device
+        var deviceID: AudioObjectID = AudioObjectID(0)
+        var size: UInt32 = UInt32(MemoryLayout<AudioObjectID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+        return status == noErr && deviceID != AudioObjectID(0)
+    }
+    
+    private func canAccessBrightnessSystem() async -> Bool {
+        if #available(OSX 10.13, *) {
+            // Try CoreDisplay method
+            let brightness = CoreDisplay_Display_GetUserBrightness(0)
+            return brightness >= 0.0 && brightness <= 1.0
+        } else {
+            // Try IOKit method
+            let service = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IODisplayConnect"))
+            if service != 0 {
+                IOObjectRelease(service)
+                return true
+            }
+            return false
         }
     }
     
-    private func requestLocationPermission() async -> Bool {
-        // This would typically involve creating a location manager and requesting permission
-        // For now, we'll return false as this requires more complex async handling
-        return false
+    // MARK: - Cache Management
+    
+    private func loadCachedPermissions() {
+        // Load all cached permissions from UserDefaults
+        let permissions = [
+            "accessibility": accessibilityPermissionKey,
+            "location": locationPermissionKey,
+            "audio": audioPermissionKey,
+            "brightness": brightnessPermissionKey
+        ]
+        
+        for (key, userDefaultsKey) in permissions {
+            if let rawValue = userDefaults.string(forKey: userDefaultsKey),
+               let state = PermissionState(rawValue: rawValue) {
+                permissionCache[key] = state
+            }
+        }
+        
+        // Load last check time
+        lastCheckTime = userDefaults.object(forKey: lastPermissionCheckKey) as? Date
     }
     
-    // MARK: - Caching
-    
-    private func getCachedPermissionState(for key: String) -> PermissionState? {
-        guard let rawValue = userDefaults.string(forKey: key) else { return nil }
-        return PermissionState(rawValue: rawValue)
+    func refreshPermissionCache() async {
+        // Clear cache and reload
+        permissionCache.removeAll()
+        await checkAllPermissions()
     }
     
-    private func setCachedPermissionState(_ state: PermissionState, for key: String) {
-        userDefaults.set(state.rawValue, forKey: key)
+    // MARK: - Permission Reset (for testing)
+    
+    func resetPermissionCache() {
+        let keys = [
+            lastPermissionCheckKey,
+            accessibilityPermissionKey,
+            locationPermissionKey,
+            audioPermissionKey,
+            brightnessPermissionKey
+        ]
+        
+        for key in keys {
+            userDefaults.removeObject(forKey: key)
+        }
+        
+        // Also reset last request times
+        let lastRequestKeys = [
+            "com.toxblh.mtmr.lastRequest.accessibility",
+            "com.toxblh.mtmr.lastRequest.location"
+        ]
+        
+        for key in lastRequestKeys {
+            userDefaults.removeObject(forKey: key)
+        }
+        
+        // Clear in-memory cache
+        permissionCache.removeAll()
+        lastCheckTime = nil
     }
     
-    // MARK: - Migration Helper
+    // MARK: - Performance Monitoring
     
-    func migrateFromLegacyPermissionManager() async {
-        // This will be called during migration to preserve cached permission states
-        // Implementation would copy over any existing cached states
-        print("Migrating permission states from legacy EnhancedPermissionManager")
+    func getCacheStats() -> (cachedPermissions: Int, lastCheck: Date?) {
+        return (permissionCache.count, lastCheckTime)
+    }
+    
+    func isCacheValid() -> Bool {
+        guard let lastCheck = lastCheckTime else { return false }
+        let timeSinceLastCheck = Date().timeIntervalSince(lastCheck)
+        return timeSinceLastCheck < permissionCheckInterval
+    }
+}
+
+// MARK: - Migration Support
+
+extension ActorBasedPermissionManager {
+    
+    /// Migrate from legacy EnhancedPermissionManager
+    func migrateFromLegacy(_ legacyManager: EnhancedPermissionManager) async {
+        print("MTMR: Migrating permission manager to actor-based version...")
+        
+        // Copy all cached permissions
+        let permissions = legacyManager.checkAllPermissions()
+        
+        // Update our cache with legacy data
+        for (permission, state) in permissions {
+            permissionCache[permission] = state
+        }
+        
+        // Copy last check time
+        if let lastCheck = UserDefaults.standard.object(forKey: lastPermissionCheckKey) as? Date {
+            lastCheckTime = lastCheck
+        }
+        
+        print("MTMR: Permission manager migration completed")
+    }
+    
+    /// Check if migration is needed
+    var needsMigration: Bool {
+        return permissionCache.isEmpty && lastCheckTime == nil
     }
 }
