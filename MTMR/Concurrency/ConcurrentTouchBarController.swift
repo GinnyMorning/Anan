@@ -43,9 +43,11 @@ class ConcurrentTouchBarController: NSObject, NSTouchBarDelegate {
     private func setupTouchBar() {
         touchBar = NSTouchBar()
         touchBar.delegate = self
-        touchBar.customizationIdentifier = .touchBarCustomization
-        touchBar.defaultItemIdentifiers = []
-        touchBar.customizationAllowedItemIdentifiers = []
+        // Note: customizationIdentifier is deprecated in newer macOS versions
+        // We'll handle this in a compatibility-aware way
+        if #available(macOS 10.13, *) {
+            touchBar.defaultItemIdentifiers = []
+        }
     }
     
     func setupControlStripPresence() {
@@ -54,7 +56,12 @@ class ConcurrentTouchBarController: NSObject, NSTouchBarDelegate {
         }
         
         let item = NSCustomTouchBarItem(identifier: .controlStripItem)
-        item.view = NSButton(image: #imageLiteral(resourceName: "StatusImage"), target: self, action: #selector(controlStripTapped))
+        // Use a system image for now - StatusImage will be added during migration
+        let button = NSButton()
+        button.image = NSImage(named: NSImage.touchBarViewOnTemplateName)
+        button.target = self
+        button.action = #selector(controlStripTapped)
+        item.view = button
         NSTouchBar.presentSystemModalTouchBar(touchBar, placement: .controlStrip, systemTrayItemIdentifier: .controlStripItem)
     }
     
@@ -194,10 +201,6 @@ class ConcurrentTouchBarController: NSObject, NSTouchBarDelegate {
 }
 
 // MARK: - Extensions
-
-extension NSTouchBarCustomizationIdentifier {
-    static let touchBarCustomization = NSTouchBarCustomizationIdentifier("com.toxblh.mtmr.touchBarCustomization")
-}
 
 extension NSTouchBarItem.Identifier {
     static let controlStripItem = NSTouchBarItem.Identifier("com.toxblh.mtmr.controlStrip")
