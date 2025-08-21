@@ -1,0 +1,44 @@
+[
+  {
+    "type": "escape",
+    "width": 64,
+    "align": "left"
+  },
+  {
+    "type": "dnd",
+    "align": "left",
+    "width": 38
+  },
+  {
+    "type": "brightness",
+    "refreshInterval": 5.0,
+    "width": 120,
+    "bordered": false,
+    "align": "left"
+  },
+  {
+    "type": "volume",
+    "width": 120,
+    "bordered": false,
+    "align": "left"
+  },
+  {
+    "type": "weather",
+    "refreshInterval": 1800,
+    "units": "metric",
+    "icon_type": "text",
+    "align": "right",
+    "bordered": false
+  },
+  {
+    "type": "battery",
+    "align": "right",
+    "bordered": false
+  },
+  {
+    "type": "timeButton",
+    "formatTemplate": "HH:mm",
+    "align": "right",
+    "bordered": false
+  }
+]

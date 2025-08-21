@@ -6,6 +6,7 @@ import CoreAudio
 class VolumeViewController: NSCustomTouchBarItem {
     private(set) var sliderItem: CustomSlider!
     private var currentDeviceId: AudioObjectID = AudioObjectID(0)
+    private var isInitialized = false
 
     init(identifier: NSTouchBarItem.Identifier, image: NSImage? = nil) {
         super.init(identifier: identifier)
@@ -19,13 +20,35 @@ class VolumeViewController: NSCustomTouchBarItem {
         sliderItem.action = #selector(VolumeViewController.sliderValueChanged(_:))
         sliderItem.minValue = 0.0
         sliderItem.maxValue = 100.0
-        sliderItem.floatValue = getInputGain() * 100
 
         view = sliderItem
         
+        // Initialize volume control
+        initializeVolumeControl()
+    }
+    
+    private func initializeVolumeControl() {
         currentDeviceId = defaultDeviceID
-        self.addAudioRouteChangedListener()
-        self.addCurrentAudioVolumeChangedListener()
+        
+        if currentDeviceId != AudioObjectID(0) {
+            print("MTMR: Volume control initialized with device ID: \(currentDeviceId)")
+            isInitialized = true
+            
+            // Set initial slider value
+            let currentVolume = getInputGain()
+            DispatchQueue.main.async {
+                self.sliderItem.floatValue = currentVolume * 100
+            }
+            
+            // Add listeners
+            self.addAudioRouteChangedListener()
+            self.addCurrentAudioVolumeChangeListener()
+        } else {
+            print("MTMR: Failed to initialize volume control - no valid audio device")
+            DispatchQueue.main.async {
+                self.sliderItem.floatValue = 50.0 // Default to 50%
+            }
+        }
     }
     
     private func addAudioRouteChangedListener() {
@@ -34,30 +57,44 @@ class VolumeViewController: NSCustomTouchBarItem {
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMaster)
-        AudioObjectAddPropertyListenerBlock(audioId, &forPropertyAddress, nil, audioRouteChanged)
+        
+        let status = AudioObjectAddPropertyListenerBlock(audioId, &forPropertyAddress, nil, audioRouteChanged)
+        if status != noErr {
+            print("MTMR: Failed to add audio route change listener: \(status)")
+        }
     }
     
 
     func audioRouteChanged(numberAddresses _: UInt32, addresses _: UnsafePointer<AudioObjectPropertyAddress>) {
+        print("MTMR: Audio route changed, reinitializing volume control")
         self.removeLastAudioVolumeChangeListener()
         currentDeviceId = defaultDeviceID
-        self.addCurrentAudioVolumeChangedListener()
+        self.addCurrentAudioVolumeChangeListener()
+        
+        let currentVolume = getInputGain()
         DispatchQueue.main.async {
-            self.sliderItem.floatValue = self.getInputGain() * 100
+            self.sliderItem.floatValue = currentVolume * 100
         }
     }
     
-    private func addCurrentAudioVolumeChangedListener() {
+    private func addCurrentAudioVolumeChangeListener() {
+        guard currentDeviceId != AudioObjectID(0) else { return }
+        
         var forPropertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
             mScope: kAudioDevicePropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMaster
         )
 
-        AudioObjectAddPropertyListenerBlock(defaultDeviceID, &forPropertyAddress, nil, audioObjectPropertyListenerBlock)
+        let status = AudioObjectAddPropertyListenerBlock(currentDeviceId, &forPropertyAddress, nil, audioObjectPropertyListenerBlock)
+        if status != noErr {
+            print("MTMR: Failed to add volume change listener: \(status)")
+        }
     }
     
     private func removeLastAudioVolumeChangeListener() {
+        guard currentDeviceId != AudioObjectID(0) else { return }
+        
         var forPropertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
             mScope: kAudioDevicePropertyScopeOutput,
@@ -68,8 +105,9 @@ class VolumeViewController: NSCustomTouchBarItem {
     }
 
     func audioObjectPropertyListenerBlock(numberAddresses _: UInt32, addresses _: UnsafePointer<AudioObjectPropertyAddress>) {
+        let currentVolume = getInputGain()
         DispatchQueue.main.async {
-            self.sliderItem.floatValue = self.getInputGain() * 100
+            self.sliderItem.floatValue = currentVolume * 100
         }
     }
 
@@ -83,7 +121,17 @@ class VolumeViewController: NSCustomTouchBarItem {
 
     @objc func sliderValueChanged(_ sender: Any) {
         if let sliderItem = sender as? NSSlider {
-            _ = setInputGain(Float32(sliderItem.intValue) / 100.0)
+            let newVolume = Float32(sliderItem.intValue) / 100.0
+            let status = setInputGain(newVolume)
+            
+            if status != noErr {
+                print("MTMR: Failed to set volume: \(status)")
+                // Revert slider to current system volume
+                let currentVolume = getInputGain()
+                DispatchQueue.main.async {
+                    self.sliderItem.floatValue = currentVolume * 100
+                }
+            }
         }
     }
 
@@ -94,22 +142,38 @@ class VolumeViewController: NSCustomTouchBarItem {
         address.mSelector = AudioObjectPropertySelector(kAudioHardwarePropertyDefaultOutputDevice)
         address.mScope = AudioObjectPropertyScope(kAudioObjectPropertyScopeGlobal)
         address.mElement = AudioObjectPropertyElement(kAudioObjectPropertyElementMaster)
-        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+        
+        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+        if status != noErr {
+            print("MTMR: Failed to get default audio device: \(status)")
+            return AudioObjectID(0)
+        }
+        
         return deviceID
     }
 
     private func getInputGain() -> Float32 {
+        guard currentDeviceId != AudioObjectID(0) else { return 0.5 }
+        
         var volume: Float32 = 0.5
         var size: UInt32 = UInt32(MemoryLayout.size(ofValue: volume))
         var address: AudioObjectPropertyAddress = AudioObjectPropertyAddress()
         address.mSelector = AudioObjectPropertySelector(kAudioHardwareServiceDeviceProperty_VirtualMainVolume)
         address.mScope = AudioObjectPropertyScope(kAudioDevicePropertyScopeOutput)
         address.mElement = AudioObjectPropertyElement(kAudioObjectPropertyElementMaster)
-        AudioObjectGetPropertyData(defaultDeviceID, &address, 0, nil, &size, &volume)
+        
+        let status = AudioObjectGetPropertyData(currentDeviceId, &address, 0, nil, &size, &volume)
+        if status != noErr {
+            print("MTMR: Failed to get volume: \(status)")
+            return 0.5
+        }
+        
         return volume
     }
 
     private func setInputGain(_ volume: Float32) -> OSStatus {
+        guard currentDeviceId != AudioObjectID(0) else { return -1 }
+        
         var inputVolume: Float32 = volume
 
         if inputVolume == 0.0 {
@@ -123,16 +187,30 @@ class VolumeViewController: NSCustomTouchBarItem {
         address.mScope = AudioObjectPropertyScope(kAudioDevicePropertyScopeOutput)
         address.mElement = AudioObjectPropertyElement(kAudioObjectPropertyElementMaster)
         address.mSelector = AudioObjectPropertySelector(kAudioHardwareServiceDeviceProperty_VirtualMainVolume)
-        return AudioObjectSetPropertyData(defaultDeviceID, &address, 0, nil, size, &inputVolume)
+        
+        let status = AudioObjectSetPropertyData(currentDeviceId, &address, 0, nil, size, &inputVolume)
+        if status != noErr {
+            print("MTMR: Failed to set volume: \(status)")
+        }
+        
+        return status
     }
 
     private func setMute(mute: Int) -> OSStatus {
+        guard currentDeviceId != AudioObjectID(0) else { return -1 }
+        
         var muteVal: Int = mute
         var address: AudioObjectPropertyAddress = AudioObjectPropertyAddress()
         address.mSelector = AudioObjectPropertySelector(kAudioDevicePropertyMute)
         let size: UInt32 = UInt32(MemoryLayout.size(ofValue: muteVal))
         address.mScope = AudioObjectPropertyScope(kAudioDevicePropertyScopeOutput)
         address.mElement = AudioObjectPropertyElement(kAudioObjectPropertyElementMaster)
-        return AudioObjectSetPropertyData(defaultDeviceID, &address, 0, nil, size, &muteVal)
+        
+        let status = AudioObjectSetPropertyData(currentDeviceId, &address, 0, nil, size, &muteVal)
+        if status != noErr {
+            print("MTMR: Failed to set mute: \(status)")
+        }
+        
+        return status
     }
 }
