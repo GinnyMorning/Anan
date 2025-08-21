@@ -139,7 +139,10 @@ class UpNextScrubberTouchBarItem: NSCustomTouchBarItem {
             bundleIdentifier = UpNextCalenderSource.bundleIdentifier
         }
         
-        NSWorkspace.shared.launchApplication(withBundleIdentifier: bundleIdentifier, options: [.default], additionalEventParamDescriptor: nil, launchIdentifier: nil)
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+        }
 
         // NB: if you can't open app which on another space, try to check mark
         // "When switching to an application, switch to a Space with open windows for the application"

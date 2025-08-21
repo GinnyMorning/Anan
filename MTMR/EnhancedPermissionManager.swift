@@ -65,7 +65,7 @@ class EnhancedPermissionManager: NSObject {
     }
     
     func checkLocationPermission() -> PermissionState {
-        let status = CLLocationManager.authorizationStatus()
+        let status = CLLocationManager().authorizationStatus
         let state: PermissionState
         
         switch status {

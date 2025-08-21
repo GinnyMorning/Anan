@@ -475,7 +475,7 @@ struct FailableDecodable<Base : Decodable> : Decodable {
     }
 }
 
-struct Action: Decodable {
+struct Action: Decodable, Sendable {
     enum Trigger: String, Decodable {
         case singleTap
         case doubleTap
@@ -726,7 +726,7 @@ struct GeneralParameters: Decodable {
     }
 }
 
-protocol SourceProtocol {
+protocol SourceProtocol: Sendable {
     var data: Data? { get }
     var string: String? { get }
     var image: NSImage? { get }
@@ -771,7 +771,7 @@ struct Source: Decodable, SourceProtocol {
     }
 }
 
-extension NSImage: SourceProtocol {
+extension NSImage: @unchecked Sendable, SourceProtocol {
     var data: Data? {
         return nil
     }

@@ -76,7 +76,7 @@ class WeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocationManage
         }
         
         // Check location permissions
-        let status = CLLocationManager.authorizationStatus()
+        let status = CLLocationManager().authorizationStatus
         print("MTMR: Weather widget - Initial location status: \(status.rawValue)")
         
         if status == .restricted || status == .denied {

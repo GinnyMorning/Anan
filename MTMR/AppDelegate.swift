@@ -14,14 +14,15 @@ import Sparkle
 class AppDelegate: NSObject, NSApplicationDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     var isBlockedApp: Bool = false
+    
+    // Modern Sparkle updater controller
+    private var updaterController: SPUStandardUpdaterController?
 
     private var fileSystemSource: DispatchSourceFileSystemObject?
 
     func applicationDidFinishLaunching(_: Notification) {
-        // Configure Sparkle
-        SUUpdater.shared().automaticallyDownloadsUpdates = false
-        SUUpdater.shared().automaticallyChecksForUpdates = true
-        SUUpdater.shared().checkForUpdatesInBackground()
+        // Configure modern Sparkle updater
+        setupSparkleUpdater()
 
         // Request accessibility permissions with prompt
         // Note: Using hardcoded constant to avoid concurrency issues with system constant
@@ -42,6 +43,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(updateIsBlockedApp), name: NSWorkspace.didLaunchApplicationNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(updateIsBlockedApp), name: NSWorkspace.didTerminateApplicationNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(updateIsBlockedApp), name: NSWorkspace.didActivateApplicationNotification, object: nil)
+    }
+    
+    private func setupSparkleUpdater() {
+        // Create modern Sparkle updater controller
+        let updater = SPUUpdater(hostBundle: Bundle.main, applicationBundle: Bundle.main, userDriver: SPUStandardUserDriver(hostBundle: Bundle.main, delegate: nil), delegate: nil)
+        
+        // Configure updater settings
+        updater.automaticallyDownloadsUpdates = false
+        updater.automaticallyChecksForUpdates = true
+        
+        // Create the updater controller with proper delegate structure
+        updaterController = SPUStandardUpdaterController(updaterDelegate: nil, userDriverDelegate: nil)
+        
+        // Check for updates in background
+        updater.checkForUpdatesInBackground()
+    }
+    
+    @objc func checkForUpdates(_: Any?) {
+        updaterController?.checkForUpdates(nil)
     }
 
     func applicationWillTerminate(_: Notification) {}
@@ -140,7 +160,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(withTitle: "Preferences", action: #selector(openPreferences(_:)), keyEquivalent: ",")
         menu.addItem(withTitle: "Open preset", action: #selector(openPreset(_:)), keyEquivalent: "O")
-        menu.addItem(withTitle: "Check for Updates...", action: #selector(SUUpdater.checkForUpdates(_:)), keyEquivalent: "").target = SUUpdater.shared()
+        let checkForUpdatesItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        menu.addItem(checkForUpdatesItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(settingSeparator)

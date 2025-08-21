@@ -154,8 +154,9 @@ public class CPU: NSObject {
                 return [thread_basic_info]();
             }
             basic_info_th = withUnsafePointer(to: &thinfo.pointee, { (ptr) -> thread_basic_info_t in
-                let int8Ptr = unsafeBitCast(ptr, to: thread_basic_info_t.self)
-                return int8Ptr
+                ptr.withMemoryRebound(to: thread_basic_info.self, capacity: 1) { reboundPtr in
+                    return UnsafeMutablePointer(mutating: reboundPtr)
+                }
             })
             if basic_info_th != nil {
                 result.append(basic_info_th!.pointee)
@@ -179,8 +180,9 @@ public class CPU: NSObject {
                 return [thread_identifier_info]();
             }
             identifier_info_th = withUnsafePointer(to: &thinfo.pointee, { (ptr) -> thread_identifier_info_t in
-                let int8Ptr = unsafeBitCast(ptr, to: thread_identifier_info_t.self)
-                return int8Ptr
+                ptr.withMemoryRebound(to: thread_identifier_info.self, capacity: 1) { reboundPtr in
+                    return UnsafeMutablePointer(mutating: reboundPtr)
+                }
             })
             if identifier_info_th != nil {
                 result.append(identifier_info_th!.pointee)
