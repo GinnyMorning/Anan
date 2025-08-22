@@ -260,12 +260,96 @@ extension MenuManager {
     @objc func addQuickWidget(_ sender: NSMenuItem) {
         guard let widgetType = sender.representedObject as? String else { return }
         print("MTMR: Adding quick widget: \(widgetType)")
-        // TODO: Implement actual widget addition in Phase 2
         
-        // For now, show an alert with next steps
+        // Create a basic widget configuration
+        let widgetConfig: [String: Any] = [
+            "type": widgetType,
+            "title": sender.title,
+            "width": 100,
+            "align": "left"
+        ]
+        
+        // Get the current configuration file path
+        let configPath = getConfigurationFilePath()
+        
+        // Read current configuration
+        if let currentConfig = readCurrentConfiguration(from: configPath) {
+            // Add the new widget to the configuration
+            var updatedConfig = currentConfig
+            if var items = updatedConfig["items"] as? [[String: Any]] {
+                items.append(widgetConfig)
+                updatedConfig["items"] = items
+                
+                // Write the updated configuration
+                if writeConfiguration(updatedConfig, to: configPath) {
+                    showSuccessAlert(widgetName: sender.title)
+                } else {
+                    showErrorAlert(message: "Failed to save configuration")
+                }
+            } else {
+                // Initialize items array if it doesn't exist
+                updatedConfig["items"] = [widgetConfig]
+                if writeConfiguration(updatedConfig, to: configPath) {
+                    showSuccessAlert(widgetName: sender.title)
+                } else {
+                    showErrorAlert(message: "Failed to save configuration")
+                }
+            }
+        } else {
+            // Create new configuration if none exists
+            let newConfig: [String: Any] = [
+                "items": [widgetConfig]
+            ]
+            if writeConfiguration(newConfig, to: configPath) {
+                showSuccessAlert(widgetName: sender.title)
+            } else {
+                showErrorAlert(message: "Failed to create configuration")
+            }
+        }
+    }
+    
+    private func getConfigurationFilePath() -> String {
+        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
+        return homeDirectory.appendingPathComponent(".mtmr/items.json").path
+    }
+    
+    private func readCurrentConfiguration(from path: String) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let config = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return config
+    }
+    
+    private func writeConfiguration(_ config: [String: Any], to path: String) -> Bool {
+        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .prettyPrinted) else {
+            return false
+        }
+        
+        // Ensure the directory exists
+        let directory = URL(fileURLWithPath: path).deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        
+        do {
+            try data.write(to: URL(fileURLWithPath: path))
+            return true
+        } catch {
+            return false
+        }
+    }
+    
+    private func showSuccessAlert(widgetName: String) {
         let alert = NSAlert()
-        alert.messageText = "Quick Widget Addition"
-        alert.informativeText = "Adding '\(sender.title)' widget.\n\nThis feature will be fully implemented in Phase 2. For now, please use 'Edit Configuration' to add widgets manually."
+        alert.messageText = "Widget Added Successfully!"
+        alert.informativeText = "The '\(widgetName)' widget has been added to your TouchBar configuration.\n\nMTMR will automatically reload the configuration."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func showErrorAlert(message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Error Adding Widget"
+        alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }

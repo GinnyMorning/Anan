@@ -109,10 +109,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let widgetType = sender.representedObject as? String else { return }
         print("MTMR: Adding quick widget: \(widgetType)")
         
-        // Show informational alert for Phase 1
+        // Use the centralized preset manager
+        let widget = WidgetDescriptor(
+            name: sender.title,
+            type: widgetType,
+            width: 100,
+            align: "left"
+        )
+        
+        if CentralizedPresetManager.shared.addWidget(widget) {
+            showSuccessAlert(widgetName: sender.title)
+        } else {
+            showErrorAlert(message: "Failed to add widget to configuration")
+        }
+    }
+    
+    private func showSuccessAlert(widgetName: String) {
         let alert = NSAlert()
-        alert.messageText = "Quick Widget Addition"
-        alert.informativeText = "Adding '\(sender.title)' widget.\n\nThis feature will be fully implemented in Phase 2. For now, please use 'Edit Configuration' to add widgets manually."
+        alert.messageText = "Widget Added Successfully!"
+        alert.informativeText = "The '\(widgetName)' widget has been added to your TouchBar configuration.\n\nMTMR will automatically reload the configuration."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func showErrorAlert(message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Error Adding Widget"
+        alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
@@ -126,34 +149,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openWidgetBrowser(_: Any?) {
         print("MTMR: Opening Widget Browser...")
         
-        // Phase 2: Widget Browser - Available!
-        let alert = NSAlert()
-        alert.messageText = "🚀 Widget Browser - Phase 2"
-        alert.informativeText = "Widget Browser is now available!\n\nThis feature provides a beautiful interface to browse and add widgets without editing JSON files.\n\nFeatures:\n• Visual widget discovery\n• One-click widget addition\n• Widget categories and search\n• Preview and description"
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        // Phase 2: Widget Browser - Now Working!
+        SimpleWidgetBrowser.shared.showBrowser()
     }
     
     @objc func openQuickConfigurationTools(_: Any?) {
         print("MTMR: Opening Quick Configuration Tools...")
         
-        // Phase 3: Quick Configuration Tools - Available!
-        let alert = NSAlert()
-        alert.messageText = "⚡ Quick Configuration Tools - Phase 3"
-        alert.informativeText = "Quick Configuration Tools are now available!\n\nThis feature provides powerful shortcuts for:\n• Quick widget configuration\n• Duplicate, move, delete widgets\n• Export and share configurations\n• Reset widgets to defaults"
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        // Phase 3: Quick Configuration Tools - Now Working!
+        SimpleQuickConfigurationTool.shared.showTool()
     }
     
     @objc func openAdvancedVisualEditor(_: Any?) {
         print("MTMR: Opening Advanced Visual Editor...")
         
-        // Phase 4: Advanced Visual Editor - Available!
-        let alert = NSAlert()
-        alert.messageText = "🎨 Advanced Visual Editor - Phase 4"
-        alert.informativeText = "Advanced Visual Editor is now available!\n\nThis feature provides a professional-grade editor with:\n• Drag-and-drop TouchBar layout management\n• Visual widget configuration\n• Widget templates and presets\n• Performance monitoring\n• Advanced layout controls"
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        // Phase 4: Advanced Visual Editor - Now Working!
+        SimpleAdvancedVisualEditor.shared.showEditor()
     }
     
     @objc func openCustomWidgetBuilder(_: Any?) {

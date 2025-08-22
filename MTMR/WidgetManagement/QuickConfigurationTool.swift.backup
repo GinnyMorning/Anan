@@ -3,7 +3,7 @@
 //  MTMR
 //
 //  Created by Enhanced Menu System on 2024.
-//  Quick configuration tools for widget management.
+//  Phase 3: Quick Configuration Shortcuts and Quick Access Tools.
 //
 
 import Cocoa
@@ -48,15 +48,6 @@ final class QuickConfigurationTool: ObservableObject {
         let quickActionsWindow = createQuickActionsWindow()
         quickActionsWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-    
-    func show() {
-        // Show a simple configuration overview
-        let alert = NSAlert()
-        alert.messageText = "⚡ Quick Configuration Tools"
-        alert.informativeText = "Quick Configuration Tools are now available!\n\nThis feature provides powerful shortcuts for:\n• Quick widget configuration\n• Duplicate, move, delete widgets\n• Export and share configurations\n• Reset widgets to defaults"
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
     
     // MARK: - Private Methods
@@ -117,7 +108,7 @@ final class QuickConfigurationTool: ObservableObject {
                 self?.saveConfiguration()
             },
             onCancel: { [weak self] in
-                self?.configurationWindow?.close()
+                self?.closeConfigurationWindow()
             }
         )
         
@@ -129,20 +120,18 @@ final class QuickConfigurationTool: ObservableObject {
     
     private func createQuickActionsWindow() -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 400),
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         
         window.title = "Quick Actions"
         window.center()
-        window.setFrameAutosaveName("QuickActionsWindow")
         
         let quickActionsView = QuickActionsView(
-            widget: currentWidget!,
-            quickActions: quickActions,
-            onAction: { [weak self] action in
+            actions: quickActions,
+            onActionSelected: { [weak self] action in
                 self?.executeAction(action)
             }
         )
@@ -153,53 +142,76 @@ final class QuickConfigurationTool: ObservableObject {
         return window
     }
     
-    private func executeAction(_ action: QuickAction) {
+    private func closeConfigurationWindow() {
+        configurationWindow?.close()
+        configurationWindow = nil
+        isVisible = false
+        currentWidget = nil
+    }
+    
+    private func saveConfiguration() {
         guard let widget = currentWidget else { return }
         
-        switch action.id {
-        case "duplicate":
-            duplicateWidget(widget)
-        case "move":
-            moveWidget(widget)
-        case "delete":
-            deleteWidget(widget)
-        case "reset":
-            resetWidget(widget)
-        case "export":
-            exportWidget(widget)
-        case "share":
-            shareWidget(widget)
-        default:
-            break
+        // Update the widget in the current configuration
+        if let config = configurationManager.currentConfiguration,
+           let index = config.widgets.firstIndex(where: { $0.id == widget.id }) {
+            config.widgets[index] = widget
+            
+            // Save configuration
+            do {
+                try configurationManager.saveConfiguration(config)
+                print("MTMR: Widget configuration saved successfully")
+                
+                // Reload TouchBar
+                TouchBarController.shared.reloadPreset(path: nil)
+                
+                // Show success feedback
+                showSuccessAlert()
+                
+                // Close window
+                closeConfigurationWindow()
+            } catch {
+                showErrorAlert(error: error)
+            }
         }
     }
     
-    private func duplicateWidget(_ widget: WidgetConfiguration) {
-        guard let config = configurationManager.currentConfiguration else { return }
+    // MARK: - Quick Actions Implementation
+    
+    private func duplicateWidget() {
+        guard let widget = currentWidget else { return }
         
         let duplicatedWidget = WidgetConfiguration(
             descriptor: widget.descriptor,
             configuration: widget.configuration,
-            position: config.widgets.count
+            position: widget.position + 1
         )
         
-        config.widgets.append(duplicatedWidget)
-        
-        do {
-            try configurationManager.saveConfiguration(config)
-            TouchBarController.shared.reloadPreset(path: nil)
-            showSuccessAlert(message: "Widget duplicated successfully!")
-        } catch {
-            showErrorAlert(error: error)
+        // Add to configuration
+        if let config = configurationManager.currentConfiguration {
+            config.widgets.append(duplicatedWidget)
+            
+            // Save and reload
+            do {
+                try configurationManager.saveConfiguration(config)
+                TouchBarController.shared.reloadPreset(path: nil)
+                showSuccessAlert(message: "Widget duplicated successfully!")
+            } catch {
+                showErrorAlert(error: error)
+            }
         }
     }
     
-    private func moveWidget(_ widget: WidgetConfiguration) {
+    private func moveWidget() {
+        guard let widget = currentWidget else { return }
+        
         let moveDialog = MoveWidgetDialog(widget: widget)
         moveDialog.show()
     }
     
-    private func deleteWidget(_ widget: WidgetConfiguration) {
+    private func deleteWidget() {
+        guard let widget = currentWidget else { return }
+        
         let alert = NSAlert()
         alert.messageText = "Delete Widget"
         alert.informativeText = "Are you sure you want to delete '\(widget.descriptor.name)'? This action cannot be undone."
@@ -209,11 +221,16 @@ final class QuickConfigurationTool: ObservableObject {
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            guard let config = configurationManager.currentConfiguration,
-                  let index = config.widgets.firstIndex(where: { $0.id == widget.id }) else { return }
-            
+            deleteWidgetConfirmed(widget)
+        }
+    }
+    
+    private func deleteWidgetConfirmed(_ widget: WidgetConfiguration) {
+        if let config = configurationManager.currentConfiguration,
+           let index = config.widgets.firstIndex(where: { $0.id == widget.id }) {
             config.widgets.remove(at: index)
             
+            // Save and reload
             do {
                 try configurationManager.saveConfiguration(config)
                 TouchBarController.shared.reloadPreset(path: nil)
@@ -224,78 +241,92 @@ final class QuickConfigurationTool: ObservableObject {
         }
     }
     
-    private func resetWidget(_ widget: WidgetConfiguration) {
+    private func resetWidget() {
+        guard let widget = currentWidget else { return }
+        
         let alert = NSAlert()
         alert.messageText = "Reset Widget"
-        alert.informativeText = "Are you sure you want to reset '\(widget.descriptor.name)' to its default configuration? This will remove all custom settings."
+        alert.informativeText = "Are you sure you want to reset '\(widget.descriptor.name)' to its default configuration?"
         alert.addButton(withTitle: "Reset")
         alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            var resetWidget = widget
-            resetWidget.configuration = [:]
-            
-            guard let config = configurationManager.currentConfiguration,
-                  let index = config.widgets.firstIndex(where: { $0.id == widget.id }) else { return }
-            
+            resetWidgetConfirmed(widget)
+        }
+    }
+    
+    private func resetWidgetConfirmed(_ widget: WidgetConfiguration) {
+        var resetWidget = widget
+        resetWidget.configuration = [:]
+        
+        // Update in configuration
+        if let config = configurationManager.currentConfiguration,
+           let index = config.widgets.firstIndex(where: { $0.id == widget.id }) {
             config.widgets[index] = resetWidget
             
+            // Save and reload
             do {
                 try configurationManager.saveConfiguration(config)
                 TouchBarController.shared.reloadPreset(path: nil)
-                showSuccessAlert(message: "Widget reset to default successfully!")
+                showSuccessAlert(message: "Widget reset to default!")
             } catch {
                 showErrorAlert(error: error)
             }
         }
     }
     
-    private func exportWidget(_ widget: WidgetConfiguration) {
+    private func exportWidget() {
+        guard let widget = currentWidget else { return }
+        
         let savePanel = NSSavePanel()
+        savePanel.title = "Export Widget Configuration"
+        savePanel.nameFieldStringValue = "\(widget.descriptor.name)_config.json"
         savePanel.allowedContentTypes = [.json]
-        savePanel.nameFieldStringValue = "\(widget.descriptor.name)_configuration.json"
         
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
-                do {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = .prettyPrinted
-                    let data = try encoder.encode(widget)
-                    try data.write(to: url)
-                    
-                    DispatchQueue.main.async {
-                        self.showSuccessAlert(message: "Widget configuration exported successfully!")
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.showErrorAlert(error: error)
-                    }
-                }
+                self.exportWidgetToURL(widget, url: url)
             }
         }
     }
     
-    private func shareWidget(_ widget: WidgetConfiguration) {
-        let alert = NSAlert()
-        alert.messageText = "Share Widget"
-        alert.informativeText = "Widget sharing functionality will be implemented in a future update.\n\nFor now, you can export the widget configuration and share the JSON file manually."
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-    
-    private func saveConfiguration() {
-        guard let widget = currentWidget else { return }
-        
+    private func exportWidgetToURL(_ widget: WidgetConfiguration, url: URL) {
         do {
-            try configurationManager.saveConfiguration(configurationManager.currentConfiguration!)
-            TouchBarController.shared.reloadPreset(path: nil)
-            showSuccessAlert()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(widget)
+            try data.write(to: url)
+            
+            showSuccessAlert(message: "Widget exported successfully!")
         } catch {
             showErrorAlert(error: error)
         }
     }
+    
+    private func shareWidget() {
+        guard let widget = currentWidget else { return }
+        
+        // Create sharing content
+        let sharingText = """
+        MTMR Widget: \(widget.descriptor.name)
+        
+        Type: \(widget.descriptor.identifier)
+        Description: \(widget.descriptor.description)
+        
+        Configuration:
+        \(widget.configuration.map { "  \($0.key): \($0.value)" }.joined(separator: "\n"))
+        """
+        
+        let sharingService = NSSharingServicePicker(items: [sharingText])
+        sharingService.show(relativeTo: NSRect.zero, of: NSApp.keyWindow?.contentView ?? NSView(), preferredEdge: .minY)
+    }
+    
+    private func executeAction(_ action: QuickAction) {
+        action.action()
+    }
+    
+    // MARK: - Helper Methods
     
     private func showSuccessAlert(message: String = "Configuration saved successfully!") {
         let alert = NSAlert()
@@ -308,7 +339,7 @@ final class QuickConfigurationTool: ObservableObject {
     private func showErrorAlert(error: Error) {
         let alert = NSAlert()
         alert.messageText = "Error"
-        alert.informativeText = "An error occurred: \(error.localizedDescription)"
+        alert.informativeText = "Failed to save configuration: \(error.localizedDescription)"
         alert.addButton(withTitle: "OK")
         alert.alertStyle = .critical
         alert.runModal()
@@ -317,18 +348,232 @@ final class QuickConfigurationTool: ObservableObject {
 
 // MARK: - Quick Action Model
 
-class QuickAction: Identifiable {
+struct QuickAction: Identifiable {
     let id: String
     let title: String
     let icon: String
-    let action: (WidgetConfiguration) -> Void
+    let action: () -> Void
     var isEnabled: Bool = true
+}
+
+// MARK: - SwiftUI Views
+
+struct QuickConfigurationView: View {
+    @Binding var widget: WidgetConfiguration?
+    let onSave: () -> Void
+    let onCancel: () -> Void
     
-    init(id: String, title: String, icon: String, action: @escaping (WidgetConfiguration) -> Void) {
-        self.id = id
-        self.title = title
-        self.icon = icon
-        self.action = action
+    @State private var configuration: [String: String] = [:]
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Header
+            headerView
+            
+            // Configuration fields
+            configurationFieldsView
+            
+            Spacer()
+            
+            // Action buttons
+            actionButtonsView
+        }
+        .padding()
+        .frame(minWidth: 600, minHeight: 500)
+        .onAppear {
+            loadConfiguration()
+        }
+    }
+    
+    private var headerView: some View {
+        VStack(spacing: 8) {
+            if let widget = widget {
+                HStack {
+                    if let icon = widget.descriptor.systemIcon {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .frame(width: 48, height: 48)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(widget.descriptor.name)
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        Text(widget.descriptor.description)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+            }
+        }
+    }
+    
+    private var configurationFieldsView: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                if let widget = widget {
+                    ForEach(Array(widget.descriptor.configurationSchema.fields), id: \.displayName) { field in
+                        ConfigurationFieldView(
+                            field: field,
+                            value: binding(for: field.displayName)
+                        )
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+    
+    private var actionButtonsView: some View {
+        HStack {
+            Button("Cancel") {
+                onCancel()
+            }
+            .keyboardShortcut(.escape)
+            
+            Spacer()
+            
+            Button("Save Configuration") {
+                saveConfiguration()
+                onSave()
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.return)
+        }
+    }
+    
+    private func binding(for key: String) -> Binding<String> {
+        Binding(
+            get: { configuration[key] ?? "" },
+            set: { configuration[key] = $0 }
+        )
+    }
+    
+    private func loadConfiguration() {
+        guard let widget = widget else { return }
+        
+        // Convert AnyCodable to String for editing
+        for (key, value) in widget.configuration {
+            configuration[key] = String(describing: value.value)
+        }
+    }
+    
+    private func saveConfiguration() {
+        guard let widget = widget else { return }
+        
+        // Convert String back to AnyCodable
+        for (key, value) in configuration {
+            widget.configuration[key] = AnyCodable(value)
+        }
+    }
+}
+
+struct QuickActionsView: View {
+    let actions: [QuickAction]
+    let onActionSelected: (QuickAction) -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            Text("Quick Actions")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding()
+            
+            // Actions list
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(actions) { action in
+                        QuickActionRow(
+                            action: action,
+                            onTap: { onActionSelected(action) }
+                        )
+                    }
+                }
+            }
+        }
+        .frame(width: 300, height: 400)
+    }
+}
+
+struct QuickActionRow: View {
+    let action: QuickAction
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: action.icon)
+                    .font(.title3)
+                    .foregroundColor(.accentColor)
+                    .frame(width: 24)
+                
+                Text(action.title)
+                    .font(.body)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!action.isEnabled)
+        .opacity(action.isEnabled ? 1.0 : 0.5)
+        
+        Divider()
+    }
+}
+
+struct ConfigurationFieldView: View {
+    let field: ConfigurationField
+    @Binding var value: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(field.displayName)
+                .font(.headline)
+            
+            switch field {
+            case .textField(_, let defaultValue):
+                TextField("Enter \(field.displayName)", text: $value)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onAppear {
+                        if value.isEmpty {
+                            value = defaultValue
+                        }
+                    }
+                
+            case .numberField(_, let defaultValue, _):
+                TextField("Enter \(field.displayName)", text: $value)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onAppear {
+                        if value.isEmpty {
+                            value = String(defaultValue)
+                        }
+                    }
+                
+            case .toggle(_, let defaultValue):
+                Toggle(field.displayName, isOn: Binding(
+                    get: { value == "true" },
+                    set: { value = $0 ? "true" : "false" }
+                ))
+                .onAppear {
+                    if value.isEmpty {
+                        value = String(defaultValue)
+                    }
+                }
+                
+            default:
+                Text("Configuration type not yet implemented")
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
+        }
     }
 }
 
@@ -448,77 +693,60 @@ struct QuickConfigurationView: View {
 }
 
 struct QuickActionsView: View {
-    let widget: WidgetConfiguration
-    let quickActions: [QuickAction]
-    let onAction: (QuickAction) -> Void
+    let actions: [QuickAction]
+    let onActionSelected: (QuickAction) -> Void
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             // Header
-            HStack {
-                if let icon = widget.descriptor.systemIcon {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 32, height: 32)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(widget.descriptor.name)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    
-                    Text("Quick Actions")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-            }
+            Text("Quick Actions")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding()
             
             // Actions list
-            LazyVStack(spacing: 12) {
-                ForEach(quickActions, id: \.id) { action in
-                    QuickActionRow(action: action, onAction: onAction)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(actions) { action in
+                        QuickActionRow(
+                            action: action,
+                            onTap: { onActionSelected(action) }
+                        )
+                    }
                 }
             }
-            
-            Spacer()
         }
-        .padding()
-        .frame(minWidth: 400, minHeight: 300)
+        .frame(width: 300, height: 400)
     }
 }
 
 struct QuickActionRow: View {
     let action: QuickAction
-    let onAction: (QuickAction) -> Void
+    let onTap: () -> Void
     
     var body: some View {
-        Button(action: { onAction(action) }) {
-            HStack {
-                if let icon = NSImage(systemSymbolName: action.icon, accessibilityDescription: action.title) {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                }
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: action.icon)
+                    .font(.title3)
+                    .foregroundColor(.accentColor)
+                    .frame(width: 24)
                 
                 Text(action.title)
                     .font(.body)
                 
                 Spacer()
-                
-                if !action.isEnabled {
-                    Image(systemSymbolName: "exclamationmark.triangle")
-                        .foregroundColor(.orange)
-                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(6)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.clear)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
         .disabled(!action.isEnabled)
+        .opacity(action.isEnabled ? 1.0 : 0.5)
+        
+        Divider()
     }
 }
 
@@ -530,20 +758,14 @@ struct ConfigurationFieldView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(field.displayName)
                 .font(.headline)
-                .fontWeight(.medium)
             
             switch field {
-            case .title(let name):
-                Text(name)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
             case .textField(_, let defaultValue):
                 TextField("Enter \(field.displayName)", text: $value)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .onAppear {
                         if value.isEmpty {
-                            value = String(defaultValue)
+                            value = defaultValue
                         }
                     }
                 
