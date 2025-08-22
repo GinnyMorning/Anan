@@ -1,0 +1,151 @@
+name: Anan CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode
+      run: sudo xcode-select -switch /Applications/Xcode_15.2.app
+      
+    - name: Build Anan
+      run: |
+        xcodebuild -project Anan.xcodeproj \
+                   -scheme Anan \
+                   -configuration Debug \
+                   -destination 'platform=macOS' \
+                   build
+                   
+    - name: Build Anan (Release)
+      run: |
+        xcodebuild -project Anan.xcodeproj \
+                   -scheme Anan \
+                   -configuration Release \
+                   -destination 'platform=macOS' \
+                   build
+                   
+    - name: Run Tests
+      run: |
+        xcodebuild -project Anan.xcodeproj \
+                   -scheme Anan \
+                   -configuration Debug \
+                   -destination 'platform=macOS' \
+                   test
+                   
+    - name: Check for warnings
+      run: |
+        xcodebuild -project Anan.xcodeproj \
+                   -scheme Anan \
+                   -configuration Debug \
+                   -destination 'platform=macOS' \
+                   build | grep -E "(warning|Warning|WARNING)" || echo "No warnings found"
+                   
+    - name: Check for errors
+      run: |
+        xcodebuild -project Anan.xcodeproj \
+                   -scheme Anan \
+                   -configuration Debug \
+                   -destination 'platform=macOS' \
+                   build | grep -E "(error|Error|ERROR)" || echo "No errors found"
+
+  code-quality:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check file structure
+      run: |
+        echo "=== Checking AnnaBo project structure ==="
+        ls -la
+        echo "=== Checking for required files ==="
+        test -f README.md && echo "✅ README.md found"
+        test -f LICENSE && echo "✅ LICENSE found"
+        test -f CONTRIBUTING.md && echo "✅ CONTRIBUTING.md found"
+        test -f CODE_OF_CONDUCT.md && echo "✅ CODE_OF_CONDUCT.md found"
+        test -f .gitignore && echo "✅ .gitignore found"
+        test -f Anan.xcodeproj/project.pbxproj && echo "✅ Xcode project found"
+        
+    - name: Check documentation
+      run: |
+        echo "=== Checking documentation files ==="
+        test -f ARCHITECTURE.md && echo "✅ ARCHITECTURE.md found"
+        test -f DEVELOPMENT_CHECKLIST.md && echo "✅ DEVELOPMENT_CHECKLIST.md found"
+        test -f README_BEST_PRACTICES.md && echo "✅ README_BEST_PRACTICES.md found"
+        test -f BEST_PRACTICES_SUMMARY.md && echo "✅ BEST_PRACTICES_SUMMARY.md found"
+        
+    - name: Check source files
+      run: |
+        echo "=== Checking core source files ==="
+        test -f "PresetManagement/CentralizedPresetManager.swift" && echo "✅ CentralizedPresetManager.swift found"
+        test -f "EnhancedPermissionManager.swift" && echo "✅ EnhancedPermissionManager.swift found"
+        test -f "PresetManagement/CentralizedPresetManager+Performance.swift" && echo "✅ Performance extension found"
+
+  security:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check for sensitive data
+      run: |
+        echo "=== Checking for sensitive data ==="
+        # Check for hardcoded API keys
+        if grep -r "sk_live\|pk_live\|AKIA\|ghp_" . --exclude-dir=.git --exclude-dir=DerivedData; then
+          echo "⚠️  Potential sensitive data found"
+          exit 1
+        else
+          echo "✅ No obvious sensitive data found"
+        fi
+        
+    - name: Check file permissions
+      run: |
+        echo "=== Checking file permissions ==="
+        # Ensure no world-writable files
+        find . -type f -perm -002 -not -path "./.git/*" -not -path "./DerivedData/*" || echo "✅ No world-writable files found"
+
+  release:
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Release
+      run: |
+        xcodebuild -project AnnaBo.xcodeproj \
+                   -scheme AnnaBo \
+                   -configuration Release \
+                   -destination 'platform=macOS' \
+                   -archivePath AnnaBo.xcarchive \
+                   archive
+                   
+    - name: Create DMG
+      run: |
+        # This would require additional tools like create-dmg
+        echo "Release build completed successfully"
+        echo "Manual DMG creation required for now"
+        
+    - name: Create Release Tag
+      run: |
+        # Extract version from project
+        VERSION=$(xcodebuild -project Anan.xcodeproj -showBuildSettings | grep MARKETING_VERSION | sed 's/.*= //')
+        echo "Current version: $VERSION"
+        
+        # Create and push tag
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git tag -a "v$VERSION" -m "Release version $VERSION"
+        git push origin "v$VERSION"

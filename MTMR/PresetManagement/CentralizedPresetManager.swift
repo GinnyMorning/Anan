@@ -271,13 +271,33 @@ final class CentralizedPresetManager: ObservableObject {
         let itemsArray = config["items"] as? [[String: Any]] ?? []
         
         guard let data = try? JSONSerialization.data(withJSONObject: itemsArray, options: .prettyPrinted) else {
+            print("MTMR: Failed to serialize configuration data")
             return false
         }
         
+        // Implement atomic write operation (best practice)
+        let tempPath = path + ".tmp"
+        
         do {
-            try data.write(to: URL(fileURLWithPath: path))
+            // 1. Write to temporary file first
+            try data.write(to: URL(fileURLWithPath: tempPath))
+            
+            // 2. Create backup of existing file if it exists
+            if FileManager.default.fileExists(atPath: path) {
+                let backupPath = path + ".backup.\(Int(Date().timeIntervalSince1970))"
+                try FileManager.default.copyItem(atPath: path, toPath: backupPath)
+                print("MTMR: Created backup at: \(backupPath)")
+            }
+            
+            // 3. Atomic move operation (rename temp to final)
+            try FileManager.default.moveItem(atPath: tempPath, toPath: path)
+            
+            print("MTMR: Configuration written successfully using atomic operation")
             return true
+            
         } catch {
+            // Clean up temp file on failure
+            try? FileManager.default.removeItem(atPath: tempPath)
             print("MTMR: Failed to write configuration: \(error)")
             return false
         }
