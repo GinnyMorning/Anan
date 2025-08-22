@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import CoreLocation
+import AudioToolbox
 
 class EnhancedPermissionManager: NSObject {
     static let shared = EnhancedPermissionManager()

@@ -24,12 +24,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Configure modern Sparkle updater
         setupSparkleUpdater()
 
-        // Request accessibility permissions with prompt
-        // Note: Using hardcoded constant to avoid concurrency issues with system constant
-        let options: NSDictionary = [
-            "AXTrustedCheckOptionPrompt": true
-        ]
-        AXIsProcessTrustedWithOptions(options)
+        // Smart permission management - only request if needed
+        if EnhancedPermissionManager.shared.shouldCheckPermissions() {
+            print("MTMR: Checking permissions...")
+            let permissions = EnhancedPermissionManager.shared.checkAllPermissions()
+            
+            // Only request accessibility permission if not already granted
+            if permissions["accessibility"] != .granted {
+                print("MTMR: Requesting accessibility permission...")
+                EnhancedPermissionManager.shared.smartRequestPermission(for: "accessibility")
+            } else {
+                print("MTMR: Accessibility permission already granted")
+            }
+        } else {
+            print("MTMR: Skipping permission check (recently checked)")
+        }
 
         TouchBarController.shared.setupControlStripPresence()
 
