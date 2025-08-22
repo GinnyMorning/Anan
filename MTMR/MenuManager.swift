@@ -260,83 +260,27 @@ extension MenuManager {
     @objc func addQuickWidget(_ sender: NSMenuItem) {
         guard let widgetType = sender.representedObject as? String else { return }
         print("MTMR: Adding quick widget: \(widgetType)")
+        print("MTMR: CentralizedPresetManager.shared exists: \(CentralizedPresetManager.shared != nil)")
         
-        // Create a basic widget configuration
-        let widgetConfig: [String: Any] = [
-            "type": widgetType,
-            "title": sender.title,
-            "width": 100,
-            "align": "left"
-        ]
+        let widgetConfig = WidgetDescriptor(
+            name: sender.title,
+            type: widgetType,
+            width: 100,
+            align: "left"
+        )
+        print("MTMR: Widget descriptor created: \(widgetConfig)")
         
-        // Get the current configuration file path
-        let configPath = getConfigurationFilePath()
+        let result = CentralizedPresetManager.shared.addWidget(widgetConfig)
+        print("MTMR: addWidget result: \(result)")
         
-        // Read current configuration
-        if let currentConfig = readCurrentConfiguration(from: configPath) {
-            // Add the new widget to the configuration
-            var updatedConfig = currentConfig
-            if var items = updatedConfig["items"] as? [[String: Any]] {
-                items.append(widgetConfig)
-                updatedConfig["items"] = items
-                
-                // Write the updated configuration
-                if writeConfiguration(updatedConfig, to: configPath) {
-                    showSuccessAlert(widgetName: sender.title)
-                } else {
-                    showErrorAlert(message: "Failed to save configuration")
-                }
-            } else {
-                // Initialize items array if it doesn't exist
-                updatedConfig["items"] = [widgetConfig]
-                if writeConfiguration(updatedConfig, to: configPath) {
-                    showSuccessAlert(widgetName: sender.title)
-                } else {
-                    showErrorAlert(message: "Failed to save configuration")
-                }
-            }
+        if result {
+            showSuccessAlert(widgetName: sender.title)
         } else {
-            // Create new configuration if none exists
-            let newConfig: [String: Any] = [
-                "items": [widgetConfig]
-            ]
-            if writeConfiguration(newConfig, to: configPath) {
-                showSuccessAlert(widgetName: sender.title)
-            } else {
-                showErrorAlert(message: "Failed to create configuration")
-            }
+            showErrorAlert(message: "Failed to add widget to configuration")
         }
     }
     
-    private func getConfigurationFilePath() -> String {
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-        return homeDirectory.appendingPathComponent(".mtmr/items.json").path
-    }
-    
-    private func readCurrentConfiguration(from path: String) -> [String: Any]? {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              let config = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        return config
-    }
-    
-    private func writeConfiguration(_ config: [String: Any], to path: String) -> Bool {
-        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .prettyPrinted) else {
-            return false
-        }
-        
-        // Ensure the directory exists
-        let directory = URL(fileURLWithPath: path).deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        
-        do {
-            try data.write(to: URL(fileURLWithPath: path))
-            return true
-        } catch {
-            return false
-        }
-    }
+
     
     private func showSuccessAlert(widgetName: String) {
         let alert = NSAlert()

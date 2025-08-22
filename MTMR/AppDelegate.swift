@@ -108,6 +108,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func addQuickWidget(_ sender: NSMenuItem) {
         guard let widgetType = sender.representedObject as? String else { return }
         print("MTMR: Adding quick widget: \(widgetType)")
+        print("MTMR: CentralizedPresetManager.shared exists: \(CentralizedPresetManager.shared != nil)")
         
         // Use the centralized preset manager
         let widget = WidgetDescriptor(
@@ -116,8 +117,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             width: 100,
             align: "left"
         )
+        print("MTMR: Widget descriptor created: \(widget)")
         
-        if CentralizedPresetManager.shared.addWidget(widget) {
+        let result = CentralizedPresetManager.shared.addWidget(widget)
+        print("MTMR: addWidget result: \(result)")
+        
+        if result {
             showSuccessAlert(widgetName: sender.title)
         } else {
             showErrorAlert(message: "Failed to add widget to configuration")

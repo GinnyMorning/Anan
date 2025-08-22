@@ -56,17 +56,36 @@ final class CentralizedPresetManager: ObservableObject {
         
         // If main configuration doesn't exist, create it from default preset
         if !fileManager.fileExists(atPath: mainConfigurationPath) {
+            print("MTMR: Main configuration file not found, creating new one...")
+            
             if let defaultPreset = Bundle.main.path(forResource: "defaultPreset", ofType: "json") {
-                try? fileManager.copyItem(atPath: defaultPreset, toPath: mainConfigurationPath)
-                print("MTMR: Created main configuration from default preset")
-            } else {
-                // Create empty configuration if no default preset
-                let emptyConfig: [String: Any] = ["items": []]
-                if let data = try? JSONSerialization.data(withJSONObject: emptyConfig, options: .prettyPrinted) {
-                    try? data.write(to: URL(fileURLWithPath: mainConfigurationPath))
-                    print("MTMR: Created empty main configuration")
+                do {
+                    try fileManager.copyItem(atPath: defaultPreset, toPath: mainConfigurationPath)
+                    print("MTMR: Created main configuration from default preset")
+                } catch {
+                    print("MTMR: Failed to copy default preset: \(error)")
+                    createEmptyConfiguration()
                 }
+            } else {
+                print("MTMR: No default preset found, creating empty configuration")
+                createEmptyConfiguration()
             }
+        } else {
+            print("MTMR: Main configuration file exists at: \(mainConfigurationPath)")
+        }
+    }
+    
+    private func createEmptyConfiguration() {
+        let emptyConfig: [String: Any] = ["items": []]
+        if let data = try? JSONSerialization.data(withJSONObject: emptyConfig, options: .prettyPrinted) {
+            do {
+                try data.write(to: URL(fileURLWithPath: mainConfigurationPath))
+                print("MTMR: Successfully created empty main configuration")
+            } catch {
+                print("MTMR: Failed to write empty configuration: \(error)")
+            }
+        } else {
+            print("MTMR: Failed to serialize empty configuration")
         }
     }
     
@@ -74,6 +93,14 @@ final class CentralizedPresetManager: ObservableObject {
     
     func addWidget(_ widget: WidgetDescriptor) -> Bool {
         print("MTMR: Adding widget '\(widget.name)' to main configuration")
+        print("MTMR: Main configuration path: \(mainConfigurationPath)")
+        
+        // Check if main configuration file exists
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: mainConfigurationPath) {
+            print("MTMR: Main configuration file does not exist, creating it...")
+            ensureMainConfigurationExists()
+        }
         
         // Read current main configuration
         guard let currentConfig = readMainConfiguration() else {
@@ -81,20 +108,28 @@ final class CentralizedPresetManager: ObservableObject {
             return false
         }
         
+        print("MTMR: Current configuration: \(currentConfig)")
+        
         // Create widget configuration
         let widgetConfig = createWidgetConfiguration(from: widget)
+        print("MTMR: Widget config created: \(widgetConfig)")
         
         // Add widget to configuration
         var updatedConfig = currentConfig
         if var items = updatedConfig["items"] as? [[String: Any]] {
             items.append(widgetConfig)
             updatedConfig["items"] = items
+            print("MTMR: Added widget to existing items array, new count: \(items.count)")
         } else {
             updatedConfig["items"] = [widgetConfig]
+            print("MTMR: Created new items array with widget")
         }
+        
+        print("MTMR: Updated configuration: \(updatedConfig)")
         
         // Write updated configuration
         if writeMainConfiguration(updatedConfig) {
+            print("MTMR: Configuration written successfully")
             // Reload TouchBar
             TouchBarController.shared.reloadPreset(path: mainConfigurationPath)
             print("MTMR: Widget added successfully and TouchBar reloaded")
@@ -214,15 +249,28 @@ final class CentralizedPresetManager: ObservableObject {
     }
     
     private func readConfiguration(from path: String) -> [String: Any]? {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              let config = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
             return nil
         }
-        return config
+        
+        // Try to parse as object first
+        if let config = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return config
+        }
+        
+        // If that fails, try to parse as array and convert to object format
+        if let itemsArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            return ["items": itemsArray]
+        }
+        
+        return nil
     }
     
     private func writeConfiguration(_ config: [String: Any], to path: String) -> Bool {
-        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .prettyPrinted) else {
+        // Extract items array and write as array format (MTMR expects array)
+        let itemsArray = config["items"] as? [[String: Any]] ?? []
+        
+        guard let data = try? JSONSerialization.data(withJSONObject: itemsArray, options: .prettyPrinted) else {
             return false
         }
         
