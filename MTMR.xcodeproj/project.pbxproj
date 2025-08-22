@@ -36,6 +36,16 @@
 		607EEA4D2087A8DA009DA5F0 /* CurrencyBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607EEA4C2087A8DA009DA5F0 /* CurrencyBarItem.swift */; };
 		60C44AFD20A373A100C0EC91 /* MusicBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C44AFC20A373A100C0EC91 /* MusicBarItem.swift */; };
 		60F7D454208CC31400ABF5D2 /* InputSourceBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F7D453208CC31400ABF5D2 /* InputSourceBarItem.swift */; };
+		764FDC132E57597C00E73BE6 /* CustomWidgetBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC122E57597C00E73BE6 /* CustomWidgetBuilder.swift */; };
+		764FDC152E57597C00E73BE6 /* PluginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC162E57597C00E73BE6 /* PluginManager.swift */; };
+		764FDC172E57597C00E73BE6 /* PluginMarketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC182E57597C00E73BE6 /* PluginMarketplace.swift */; };
+		764FDC192E57597C00E73BE6 /* CloudSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC1A2E57597C00E73BE6 /* CloudSyncManager.swift */; };
+		764FDC1B2E57597C00E73BE6 /* CloudSyncDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC1C2E57597C00E73BE6 /* CloudSyncDashboard.swift */; };
+		764FDC1D2E57597C00E73BE6 /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC1E2E57597C00E73BE6 /* AnalyticsManager.swift */; };
+		764FDC1F2E57597C00E73BE6 /* AnalyticsDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC202E57597C00E73BE6 /* AnalyticsDashboard.swift */; };
+		764FDC212E57597C00E73BE6 /* WidgetBrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC222E57597C00E73BE6 /* WidgetBrowserWindowController.swift */; };
+		764FDC232E57597C00E73BE6 /* QuickConfigurationTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC242E57597C00E73BE6 /* QuickConfigurationTool.swift */; };
+		764FDC252E57597C00E73BE6 /* AdvancedVisualEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764FDC262E57597C00E73BE6 /* AdvancedVisualEditor.swift */; };
 		B0008E552080286C003AD4DD /* SupportHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0008E542080286C003AD4DD /* SupportHelpers.swift */; };
 		B002E642216C0E38002774BA /* CoreDisplay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B002E641216C0E38002774BA /* CoreDisplay.framework */; };
 		B00D181D2152F4A5000806F4 /* Sparkle.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B00D181C2152F4A5000806F4 /* Sparkle.framework */; };
@@ -123,6 +133,14 @@
 		607EEA4C2087A8DA009DA5F0 /* CurrencyBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyBarItem.swift; sourceTree = "<group>"; };
 		60C44AFC20A373A100C0EC91 /* MusicBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBarItem.swift; sourceTree = "<group>"; };
 		60F7D453208CC31400ABF5D2 /* InputSourceBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceBarItem.swift; sourceTree = "<group>"; };
+					764FDC122E57597C00E73BE6 /* CustomWidgetBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWidgetBuilder.swift; sourceTree = "<group>"; name = CustomWidgetBuilder.swift; path = AdvancedFeatures/CustomWidgetBuilder/CustomWidgetBuilder.swift; };
+						764FDC162E57597C00E73BE6 /* PluginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManager.swift; sourceTree = "<group>"; name = PluginManager.swift; path = AdvancedFeatures/PluginSystem/PluginManager.swift; };
+						764FDC182E57597C00E73BE6 /* PluginMarketplace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginMarketplace.swift; sourceTree = "<group>"; name = PluginMarketplace.swift; path = AdvancedFeatures/PluginSystem/PluginMarketplace.swift; };
+						764FDC1A2E57597C00E73BE6 /* CloudSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncManager.swift; sourceTree = "<group>"; name = CloudSyncManager.swift; path = AdvancedFeatures/CloudSync/CloudSyncManager.swift; };
+						764FDC1C2E57597C00E73BE6 /* CloudSyncDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncDashboard.swift; sourceTree = "<group>"; name = CloudSyncDashboard.swift; path = AdvancedFeatures/CloudSync/CloudSyncDashboard.swift; };
+						764FDC1E2E57597C00E73BE6 /* AnalyticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; name = AnalyticsManager.swift; path = AdvancedFeatures/Analytics/AnalyticsManager.swift; };
+						764FDC202E57597C00E73BE6 /* AnalyticsDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsDashboard.swift; sourceTree = "<group>"; name = AnalyticsDashboard.swift; path = AdvancedFeatures/Analytics/AnalyticsDashboard.swift; };
+
 		B0008E542080286C003AD4DD /* SupportHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportHelpers.swift; sourceTree = "<group>"; };
 		B002E641216C0E38002774BA /* CoreDisplay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreDisplay.framework; path = ../../../../../System/Library/Frameworks/CoreDisplay.framework; sourceTree = "<group>"; };
 		B00D181C2152F4A5000806F4 /* Sparkle.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = Sparkle.framework; sourceTree = "<group>"; };
@@ -230,6 +248,14 @@
 		B082B251205C7D8000BC04DC /* MTMR */ = {
 			isa = PBXGroup;
 			children = (
+
+				764FDC122E57597C00E73BE6 /* CustomWidgetBuilder.swift */,
+				764FDC162E57597C00E73BE6 /* PluginManager.swift */,
+				764FDC182E57597C00E73BE6 /* PluginMarketplace.swift */,
+				764FDC1A2E57597C00E73BE6 /* CloudSyncManager.swift */,
+				764FDC1C2E57597C00E73BE6 /* CloudSyncDashboard.swift */,
+				764FDC1E2E57597C00E73BE6 /* AnalyticsManager.swift */,
+				764FDC202E57597C00E73BE6 /* AnalyticsDashboard.swift */,
 				B0B88A07208CD12000A2C160 /* Widgets */,
 				B0B1743B207D6ED40004B740 /* CBridge */,
 				B0B17426207D6AFE0004B740 /* AppleScripts */,
@@ -493,6 +519,14 @@
 				B08126EF217BD0B900A98970 /* PomodoroBarItem.swift in Sources */,
 				4CF222ED26CC43D50025BDA7 /* CPU.swift in Sources */,
 				B081732C213739FE005D4908 /* DnDBarItem.swift in Sources */,
+				764FDC132E57597C00E73BE6 /* CustomWidgetBuilder.swift in Sources */,
+				764FDC152E57597C00E73BE6 /* PluginManager.swift in Sources */,
+				764FDC172E57597C00E73BE6 /* PluginMarketplace.swift in Sources */,
+				764FDC192E57597C00E73BE6 /* CloudSyncManager.swift in Sources */,
+				764FDC1B2E57597C00E73BE6 /* CloudSyncDashboard.swift in Sources */,
+				764FDC1D2E57597C00E73BE6 /* AnalyticsManager.swift in Sources */,
+				764FDC1F2E57597C00E73BE6 /* AnalyticsDashboard.swift in Sources */,
+
 				60C44AFD20A373A100C0EC91 /* MusicBarItem.swift in Sources */,
 				B059D624205E04F3006E6B86 /* CustomButtonTouchBarItem.swift in Sources */,
 				60173D3E20C0031B002C305F /* LaunchAtLoginController.m in Sources */,
