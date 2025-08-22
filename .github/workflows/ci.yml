@@ -16,19 +16,65 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Verify project structure
+      run: |
+        echo "=== Verifying project structure ==="
+        echo "Current directory: $(pwd)"
+        echo "Repository contents:"
+        ls -la
+        
+        echo "=== Checking Xcode project ==="
+        test -f MTMR.xcodeproj/project.pbxproj && echo "✅ Xcode project found"
+        test -d MTMR/ && echo "✅ Source directory found"
+        
+        echo "=== Checking key source files ==="
+        test -f "MTMR/AppDelegate.swift" && echo "✅ AppDelegate.swift found"
+        test -f "MTMR/TouchBarController.swift" && echo "✅ TouchBarController.swift found"
+        test -f "MTMR/PresetManagement/CentralizedPresetManager.swift" && echo "✅ CentralizedPresetManager.swift found"
+        test -f "MTMR/EnhancedPermissionManager.swift" && echo "✅ EnhancedPermissionManager.swift found"
+        
+        echo "=== Checking AdvancedFeatures ==="
+        test -f "MTMR/AdvancedFeatures/CustomWidgetBuilder/CustomWidgetBuilder.swift" && echo "✅ CustomWidgetBuilder.swift found"
+        test -f "MTMR/AdvancedFeatures/PluginSystem/PluginManager.swift" && echo "✅ PluginManager.swift found"
+        test -f "MTMR/AdvancedFeatures/CloudSync/CloudSyncManager.swift" && echo "✅ CloudSyncManager.swift found"
+        test -f "MTMR/AdvancedFeatures/Analytics/AnalyticsManager.swift" && echo "✅ AnalyticsManager.swift found"
+        
+        echo "=== Cleaning any previous build artifacts ==="
+        rm -rf DerivedData/ || echo "No DerivedData to clean"
+        rm -rf build/ || echo "No build directory to clean"
+      
     - name: Select Xcode
       run: |
         # Use available Xcode version
         sudo xcode-select -switch /Applications/Xcode.app || echo "Using default Xcode"
         xcodebuild -version
+        
+        echo "=== Checking Xcode project configuration ==="
+        xcodebuild -project MTMR.xcodeproj -list
       
     - name: Build Anan
       run: |
+        echo "=== Starting build process ==="
+        echo "Current directory: $(pwd)"
+        echo "Project files:"
+        ls -la MTMR.xcodeproj/
+        
+        echo "=== Building project ==="
         xcodebuild -project MTMR.xcodeproj \
                    -scheme MTMR \
                    -configuration Debug \
                    -destination 'platform=macOS' \
-                   build
+                   -showBuildSettings \
+                   build 2>&1 || {
+          echo "❌ Build failed, checking for specific errors..."
+          echo "=== Build log excerpt ==="
+          xcodebuild -project MTMR.xcodeproj \
+                     -scheme MTMR \
+                     -configuration Debug \
+                     -destination 'platform=macOS' \
+                     build 2>&1 | tail -50
+          exit 1
+        }
                    
     - name: Build Anan (Release)
       run: |
