@@ -7,8 +7,10 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  # Using macOS 14 (Sonoma) for stability and compatibility
+  # macos-latest will migrate to macOS 15 in August 2025
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
     
     steps:
     - name: Checkout code
@@ -49,7 +51,7 @@ jobs:
         echo "Build validation ready"
 
   code-quality:
-    runs-on: macos-latest
+    runs-on: macos-14
     
     steps:
     - name: Checkout code
@@ -83,7 +85,7 @@ jobs:
         test -f "MTMR/PresetManagement/CentralizedPresetManager+Performance.swift" && echo "✅ Performance extension found"
 
   security:
-    runs-on: macos-latest
+    runs-on: macos-14
     
     steps:
     - name: Checkout code
@@ -127,7 +129,9 @@ jobs:
         echo "✅ Source code security checked"
 
   release:
-    runs-on: macos-latest
+    runs-on: macos-14
+    # TODO: Update to macos-15 when available and tested
+    # Current: macOS 14 (Sonoma) - stable and well-tested
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
